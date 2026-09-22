@@ -1,0 +1,51 @@
+{
+  "name": "dsh-startup-screen",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness 启动界面与启动动画：黑幕 DeepSeek 标识 → 过曝洗白 → 暖白档案底板 → 交互式访问授权序列（需要访问许可 / 身份资料确认 / 接收访问需求 / 开始读取权限 / 读取完毕·核验通过 / 欢迎访问）。中文主字 + 英文等宽副标题，真声素材 + 界面音效，身份名称等参数在 DSH 设置页可改。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "startup",
+    "splash",
+    "boot-animation"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "test",
+    "preview/index.html",
+    "open-preview.sh",
+    "打开预览.cmd",
+    "cordis.patch.yml",
+    "README.md",
+    "INSTALL.md",
+    "AUDIO-FIELDS.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke-host.mjs && node test/smoke-splash.mjs && node test/smoke-client.mjs"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "author": "沈宏宏"
+}

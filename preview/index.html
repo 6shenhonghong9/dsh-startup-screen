@@ -1,0 +1,568 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-startup-screen · 启动动画离线预览</title>
+
+<!-- 直接复用插件自己的运行时与样式，改 lib/ 下的文件刷新即可看到 -->
+<link rel="stylesheet" href="../lib/splash.css">
+
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: #12131a;
+    font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    color: #e8e8ea;
+  }
+
+  /* ── 幕后的"DSH 主界面"假背景：只为让揭幕那一刻有东西可看 ─────────── */
+  #mockApp { position: fixed; inset: 0; z-index: 1; display: flex; background: #f7f7f5; }
+  #mockApp .side { width: 248px; background: #efeff0; border-right: 1px solid #e2e2e0; padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+  #mockApp .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #2b2b2b; letter-spacing: .02em; margin-bottom: 6px; }
+  #mockApp .brand svg { width: 20px; height: 20px; fill: #4d6bfe; }
+  #mockApp .item { font-size: 13px; color: #55565a; padding: 7px 9px; border-radius: 8px; }
+  #mockApp .item.on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  #mockApp .main { flex: 1; display: flex; flex-direction: column; }
+  #mockApp .top { height: 46px; border-bottom: 1px solid #e6e6e4; display: flex; align-items: center; padding: 0 18px; font-size: 13px; color: #6a6b6f; }
+  #mockApp .body { flex: 1; padding: 28px 34px; display: flex; flex-direction: column; gap: 14px; }
+  #mockApp .bubble { max-width: 620px; font-size: 13.5px; line-height: 1.75; color: #2c2d31; }
+  #mockApp .bubble.me { align-self: flex-end; background: #e9eaf6; border-radius: 12px; padding: 10px 14px; }
+  #mockApp .bubble.ai { background: #fff; border: 1px solid #e8e8e6; border-radius: 12px; padding: 14px 16px; }
+  #mockApp .mockTag { position: absolute; right: 14px; bottom: 12px; font-size: 11px; color: #a9aaae; letter-spacing: .08em; }
+
+  /* ── 预览控制台（浮在启动动画之上，方便边看边改）───────────────────── */
+  #console {
+    position: fixed; right: 16px; top: 16px; width: 320px; z-index: 2147483600;
+    background: rgba(18, 19, 26, .93); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px; backdrop-filter: blur(8px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+    font-size: 12.5px; overflow: hidden;
+  }
+  #console header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.1);
+    font-weight: 600; letter-spacing: .06em; font-size: 12px;
+  }
+  #console header .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#ff7500; margin-right:7px; vertical-align:1px; }
+  #console .pane { padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 74vh; overflow: auto; }
+  #console .row { display: flex; flex-direction: column; gap: 5px; }
+  #console .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #console label { color: #a9aab2; font-size: 11px; letter-spacing: .04em; }
+  #console input[type=text], #console select {
+    width: 100%; box-sizing: border-box; background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.16); color: #f2f2f5; border-radius: 7px;
+    padding: 6px 9px; font: inherit; outline: none;
+  }
+  #console input[type=text]:focus, #console select:focus { border-color: #ff7500; }
+  #console input[type=range] { width: 100%; accent-color: #ff7500; }
+  #console .chk { display: flex; align-items: center; gap: 8px; color: #d6d6dd; }
+  #console .chk input { accent-color: #ff7500; }
+  #console .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #console button {
+    flex: 1 1 auto; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06);
+    color: #f0f0f4; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
+    white-space: nowrap;
+  }
+  #console button:hover { border-color: #ff7500; color: #fff; }
+  #console button.primary { background: #ff7500; border-color: #ff7500; color: #14151b; font-weight: 600; }
+  #console button.ghost { flex: 0 0 auto; padding: 4px 9px; font-size: 11px; color: #a9aab2; }
+  #console .note { color: #8b8c95; font-size: 11px; line-height: 1.6; }
+  #console .steps { display: flex; flex-direction: column; gap: 4px; color: #b9bac2; font-size: 11.5px; }
+  #console .steps b { color: #fff; font-weight: 600; }
+  #console.collapsed .pane { display: none; }
+
+  /* ── 设置面板模拟（DSH 设置页里的那一节）──────────────────────────── */
+  #settingsMock {
+    position: fixed; inset: 0; z-index: 2147483700; display: none;
+    background: rgba(10, 11, 16, .55); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  #settingsMock.open { display: flex; }
+  #settingsMock .dlg {
+    width: min(940px, 92vw); height: min(640px, 88vh); background: #ffffff; border-radius: 14px;
+    display: flex; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,.5); color: #23242a;
+  }
+  #settingsMock .dlgNav { width: 208px; background: #f6f6f7; border-right: 1px solid #e8e8ea; padding: 16px 10px; display: flex; flex-direction: column; gap: 3px; }
+  #settingsMock .dlgNav .t { font-size: 12px; font-weight: 700; color: #23242a; padding: 4px 10px 10px; }
+  #settingsMock .dlgNav .n { font-size: 13px; color: #55565e; padding: 7px 10px; border-radius: 8px; }
+  #settingsMock .dlgNav .n.on { background: #ebebee; color: #17181d; font-weight: 600; }
+  #settingsMock .dlgBody { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #settingsMock .dlgHead { padding: 18px 24px 12px; border-bottom: 1px solid #ededf0; display: flex; align-items: center; justify-content: space-between; }
+  #settingsMock .dlgHead h3 { margin: 0; font-size: 16px; }
+  #settingsMock .dlgHead .x { cursor: pointer; color: #8a8b93; font-size: 18px; line-height: 1; }
+  #settingsMock .dlgContent { flex: 1; overflow: auto; padding: 18px 24px 26px; }
+
+  /* 设置节样式（对应 lib/client.js 里注入的那套 __ss_* 样式）*/
+  .__ss_root { max-width: 620px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; color: #23242a; }
+  .__ss_lead { font-size: 12px; line-height: 1.65; color: #8a8b93; }
+  .__ss_group { border: 1px solid #e6e6ea; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 11px; }
+  .__ss_groupTitle { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8a8b93; }
+  .__ss_field { display: flex; flex-direction: column; gap: 5px; }
+  .__ss_label { font-size: 12px; font-weight: 600; }
+  .__ss_hint { font-size: 11px; line-height: 1.55; color: #8a8b93; }
+  .__ss_row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .__ss_two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .__ss_check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+  .__ss_checkText { display: flex; flex-direction: column; gap: 2px; }
+  .__ss_input, .__ss_select { border: 1px solid #dcdce2; background: #fff; color: #23242a; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; box-sizing: border-box; width: 100%; outline: none; }
+  .__ss_inputMono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; letter-spacing: .06em; }
+  .__ss_actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .__ss_btn { border: 1px solid #dcdce2; background: #fff; color: #23242a; border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .__ss_btnPrimary { background: #3964fe; border-color: #3964fe; color: #fff; }
+  .__ss_status { font-size: 12px; color: #8a8b93; }
+  .__ss_preview { border: 1px dashed #dcdce2; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .__ss_previewText { font-size: 12px; color: #8a8b93; line-height: 1.5; }
+  .__ss_swatch { width: 38px; height: 26px; padding: 0; border: 1px solid #dcdce2; border-radius: 6px; background: transparent; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ── 揭幕之后的假 DSH 主界面 ──────────────────────────────────────────── -->
+<div id="mockApp">
+  <div class="side">
+    <div class="brand">
+      <svg viewBox="0 0 50 50" aria-hidden="true"><path fill-rule="nonzero" d="M48.8354 10.0479C48.3232 9.79199 48.1025 10.2798 47.8032 10.5278C47.7007 10.6079 47.6143 10.7119 47.5273 10.8076C46.7793 11.624 45.9048 12.1597 44.7622 12.0957C43.0923 12 41.666 12.5356 40.4058 13.8398C40.1377 12.2319 39.2476 11.272 37.8926 10.6558C37.1836 10.3359 36.4668 10.0156 35.9702 9.31982C35.6235 8.82373 35.5293 8.27197 35.356 7.72754C35.2456 7.3999 35.1353 7.06396 34.7651 7.00781C34.3633 6.94385 34.2056 7.2876 34.0479 7.57568C33.418 8.75195 33.1733 10.0479 33.1973 11.3599C33.2524 14.312 34.4736 16.6641 36.8999 18.3359C37.1758 18.5278 37.2466 18.7197 37.1597 19C36.9946 19.5757 36.7974 20.1357 36.624 20.7119C36.5137 21.0801 36.3486 21.1597 35.9624 21C34.6309 20.4321 33.481 19.5918 32.4644 18.5757C30.7393 16.8721 29.1792 14.9917 27.2334 13.52C26.7764 13.1758 26.3193 12.856 25.8467 12.5518C23.8618 10.584 26.1069 8.96777 26.627 8.77588C27.1704 8.57568 26.8159 7.8877 25.0591 7.896C23.3022 7.90381 21.6953 8.50391 19.647 9.30371C19.3477 9.42383 19.0322 9.51172 18.7095 9.58398C16.8501 9.22363 14.9199 9.14355 12.9033 9.37598C9.10596 9.80762 6.07275 11.6396 3.84326 14.7681C1.16455 18.5278 0.53418 22.7998 1.30664 27.2559C2.11768 31.9521 4.46582 35.8398 8.07373 38.8799C11.8159 42.0322 16.1255 43.5762 21.041 43.2803C24.0269 43.104 27.3516 42.6963 31.1016 39.4561C32.0469 39.936 33.0396 40.1279 34.686 40.272C35.9546 40.3921 37.1758 40.208 38.1211 40.0078C39.6021 39.688 39.4995 38.2881 38.9639 38.0322C34.623 35.9678 35.5762 36.8081 34.71 36.1279C36.9155 33.4639 40.2402 30.6958 41.54 21.728C41.6426 21.0161 41.5557 20.5679 41.54 19.9917C41.5322 19.6396 41.6108 19.5039 42.0049 19.4639C43.0923 19.3359 44.1479 19.0317 45.1167 18.4878C47.9292 16.9199 49.064 14.3438 49.3315 11.2559C49.3711 10.7837 49.3237 10.2959 48.8354 10.0479ZM24.3262 37.8398C20.1196 34.4639 18.0791 33.3521 17.2358 33.3999C16.4482 33.4482 16.5898 34.3682 16.7632 34.9678C16.9443 35.5601 17.1812 35.9683 17.5117 36.4878C17.7402 36.832 17.8979 37.3442 17.2832 37.728C15.9282 38.584 13.5728 37.4399 13.4624 37.3838C10.7207 35.7358 8.42822 33.5601 6.81348 30.584C5.25342 27.7197 4.34766 24.6479 4.19775 21.3677C4.1582 20.5757 4.38672 20.2959 5.15869 20.1519C6.17529 19.96 7.22314 19.9199 8.23926 20.0718C12.5327 20.7119 16.1885 22.6719 19.2529 25.7759C21.002 27.5439 22.3252 29.6558 23.6885 31.7202C25.1377 33.9121 26.6978 36 28.6831 37.7119C29.3843 38.312 29.9434 38.7681 30.479 39.104C28.8643 39.2881 26.1699 39.3281 24.3262 37.8398ZM26.3433 24.6001C26.3433 24.248 26.6191 23.9678 26.9658 23.9678C27.0444 23.9678 27.1152 23.9839 27.1782 24.0078C27.2651 24.04 27.3438 24.0879 27.4067 24.1602C27.5171 24.272 27.5801 24.4321 27.5801 24.6001C27.5801 24.9521 27.3042 25.2319 26.9575 25.2319C26.6108 25.2319 26.3433 24.9521 26.3433 24.6001ZM32.6064 27.8799C32.2046 28.0479 31.8027 28.1919 31.4165 28.208C30.8179 28.2397 30.1641 27.9922 29.8096 27.688C29.2583 27.2158 28.8643 26.9521 28.6987 26.1279C28.6279 25.7759 28.6675 25.2319 28.7305 24.9199C28.8721 24.248 28.7144 23.8159 28.2495 23.4238C27.8716 23.104 27.3911 23.0161 26.8633 23.0161C26.666 23.0161 26.4849 22.9277 26.3511 22.856C26.1304 22.7441 25.9492 22.4639 26.1226 22.1201C26.1777 22.0078 26.4458 21.7358 26.5088 21.688C27.2256 21.272 28.0527 21.4077 28.8169 21.7197C29.5259 22.0161 30.0615 22.5601 30.834 23.3281C31.6216 24.2559 31.7632 24.5117 32.2124 25.208C32.5669 25.752 32.8901 26.312 33.1104 26.9521C33.2446 27.3521 33.0713 27.6802 32.6064 27.8799Z"/></svg>
+      <span>DeepSeek Harness</span>
+    </div>
+    <div class="item">＋ 新建会话</div>
+    <div class="item on">启动界面插件设计</div>
+    <div class="item">参考片风格分析</div>
+    <div class="item">dsh-meme 面板改动</div>
+    <div class="item">工作区文件整理</div>
+    <div class="item">⚙ 设置</div>
+    <div class="mockTag">MOCK — 这是假背景，只为演示"揭幕"效果</div>
+  </div>
+  <div class="main">
+    <div class="top">启动界面插件设计 · main</div>
+    <div class="body">
+      <div class="bubble me">给我做一个启动界面插件，风格照这个视频来</div>
+      <div class="bubble ai">
+        启动动画已经按参考片的语汇重做了一遍：黑幕 DeepSeek 标识 → 过曝洗白 → 暖白技术档案底板 →<br>
+        需要访问许可 / 身份资料确认 / 接收访问需求 / 读取完毕 / 验证通过 / 欢迎 xxx 访问。<br>
+        身份名称在设置页「启动动画」里改，中英双语字幕同步。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 启动动画挂载点：必须和 Host 注入的 index.html 结构一致 ───────────── -->
+<div id="dsh-startup-root" class="dsu-root dsu-boot"></div>
+
+<script>
+  /* 离线预览：让运行时知道去哪里重新加载自己 */
+  window.__DSH_STARTUP_SCRIPT_URL__ = '../lib/splash.js';
+  window.__DSH_STARTUP__ = {
+    enabled: true,
+    mode: 'always',
+    theme: 'light',
+    speed: 1,
+    requireInteraction: true,
+    allowSkip: true,
+    sound: false,
+    identity: 'JOYCE MOORE',
+    identityId: '0087',
+    accessLevel: '3',
+    brand1: 'DEEPSEEK',
+    brand2: 'SYNTHESIZE INTELLIGENCE',
+    brand3a: 'HARNESS',
+    brand3b: 'OS',
+    orgZh: '深度求索',
+    orgEn: 'DEEPSEEK',
+    orgSub: 'DEEPSEEK HARNESS',
+    welcomeBox: 'DEEPSEEK HARNESS',
+    footer: 'POWERED BY DEEPSEEK',
+    accent: '#ff7500',
+    glitchA: '#ff3b30',
+    glitchB: '#2971b8'
+  };
+  document.documentElement.classList.add('dsu-lock');
+</script>
+<script defer src="../lib/splash.js"></script>
+
+<!-- ── 预览控制台 ───────────────────────────────────────────────────────── -->
+<div id="console">
+  <header>
+    <span><span class="dot"></span>启动动画 · 离线预览</span>
+    <button class="ghost" id="btnCollapse" type="button">收起</button>
+  </header>
+  <div class="pane">
+    <div class="row">
+      <label>身份名称（终幕「欢迎 xxx 访问」）</label>
+      <input type="text" id="fIdentity" value="JOYCE MOORE" maxlength="48">
+    </div>
+    <div class="row2">
+      <div class="row">
+        <label>身份编号</label>
+        <input type="text" id="fId" value="0087" maxlength="12">
+      </div>
+      <div class="row">
+        <label>权限等级</label>
+        <input type="text" id="fLevel" value="3" maxlength="32">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="row">
+        <label>主题</label>
+        <select id="fTheme">
+          <option value="light">浅色（参考片原色）</option>
+          <option value="dark">深色</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>速度 <span id="fSpeedVal">1.00×</span></label>
+        <input type="range" id="fSpeed" min="0.35" max="3" step="0.05" value="1">
+      </div>
+    </div>
+    <div class="chk"><input type="checkbox" id="fInteract" checked><label for="fInteract">需要人工确认（第 1、2 步停下来等按钮）</label></div>
+    <div class="chk"><input type="checkbox" id="fSkip" checked><label for="fSkip">允许跳过（右上角 SKIP / Esc）</label></div>
+
+    <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:10px;display:flex;flex-direction:column;gap:10px">
+      <div class="chk"><input type="checkbox" id="fVoice" checked><label for="fVoice"><b>女声播报</b>（念每一行的英文）</label></div>
+      <div class="row2">
+        <div class="row">
+          <label>播报语言</label>
+          <select id="fVoiceLang">
+            <option value="en" selected>英语（照参考片）</option>
+            <option value="zh">中文</option>
+            <option value="both">中英各念一遍</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>语速 <span id="fVRateVal">0.88×</span></label>
+          <input type="range" id="fVRate" min="0.5" max="2" step="0.05" value="0.88">
+        </div>
+      </div>
+      <div class="row">
+        <label>音色 <span id="voiceNote" style="color:#8b8c95"></span></label>
+        <div style="display:flex;gap:8px">
+          <select id="fVoiceName" style="flex:1"><option value="">自动（优先女声）</option></select>
+          <button type="button" id="btnSample" style="flex:0 0 auto">试听</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>音调 <span id="fVPitchVal">0.85</span></label>
+        <input type="range" id="fVPitch" min="0" max="2" step="0.05" value="0.85">
+      </div>
+      <div class="row">
+        <label>开口前留白 <span id="fVLeadVal">240 ms</span></label>
+        <input type="range" id="fVLead" min="0" max="800" step="20" value="240">
+      </div>
+      <div class="chk"><input type="checkbox" id="fVoiceCue" checked><label for="fVoiceCue">播报前提示音（两声轻提示，AI 感的关键）</label></div>
+      <div class="chk"><input type="checkbox" id="fSound" checked><label for="fSound">界面音效（咔哒 / 确认音 / 扫频 / 和声钟）</label></div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="btnAiPreset" style="flex:1">↺ 套用「电影旁白」档（0.88 / 0.85 / 提示音 + 留白）</button>
+      </div>
+    </div>
+
+    <div class="btns">
+      <button class="primary" id="btnReplay" type="button">↻ 重播动画</button>
+      <button id="btnSkip" type="button">跳过</button>
+      <button id="btnSettings" type="button">设置面板预览</button>
+    </div>
+
+    <div class="note">
+      六段序列：<b>需要访问许可</b> → 身份资料确认 → 接收访问需求 → 读取完毕 → 验证通过 → 欢迎 xxx 访问。
+      第 1、2 步可交互（按钮 / Enter / 空格）。
+    </div>
+    <div class="note">离线预览不写入 DSH；正式插件的配置存在 <code>~/.dsh/dsh-startup.json</code>。</div>
+  </div>
+</div>
+
+<!-- ── DSH 设置页模拟 ───────────────────────────────────────────────────── -->
+<div id="settingsMock">
+  <div class="dlg">
+    <div class="dlgNav">
+      <div class="t">设置</div>
+      <div class="n">通用</div>
+      <div class="n">模型</div>
+      <div class="n">主题</div>
+      <div class="n">插件</div>
+      <div class="n on">启动动画</div>
+      <div class="n">人设与记忆</div>
+      <div class="n">表情包</div>
+    </div>
+    <div class="dlgBody">
+      <div class="dlgHead">
+        <h3>启动动画</h3>
+        <span class="x" id="btnCloseSettings">✕</span>
+      </div>
+      <div class="dlgContent">
+        <div class="__ss_root">
+          <div class="__ss_lead">启动界面：黑幕 DeepSeek 标识 → 过曝洗白 → 技术档案底板 → 交互式访问授权序列（需要访问许可 / 身份资料确认 / 接收访问需求 / 读取完毕 / 验证通过 / 欢迎 xxx 访问）。中文主字 + 英文等宽字幕，风格取自参考片。</div>
+
+          <div class="__ss_group">
+            <div class="__ss_groupTitle">播放</div>
+            <label class="__ss_check"><input type="checkbox" checked id="sEnabled"><span class="__ss_checkText"><span>启用启动动画</span><span class="__ss_hint">关闭后直接进主界面，不再显示启动界面。</span></span></label>
+            <div class="__ss_field"><label class="__ss_label">播放时机</label>
+              <select class="__ss_select" id="sMode">
+                <option value="session" selected>每个浏览器会话一次</option>
+                <option value="daily">每天一次</option>
+                <option value="always">每次打开都播放</option>
+              </select>
+            </div>
+            <div class="__ss_field"><label class="__ss_label">速度倍率</label>
+              <div class="__ss_row"><input type="range" min="0.35" max="3" step="0.05" value="1" style="flex:1 1 240px" id="sSpeed"><span class="__ss_status" id="sSpeedVal">1.00×</span></div>
+              <div class="__ss_hint">0.35 慢放 · 1 原速 · 3 快放；参考片时长约 27 秒，默认整套约 16 秒。</div>
+            </div>
+          </div>
+
+          <div class="__ss_group">
+            <div class="__ss_groupTitle">身份资料</div>
+            <div class="__ss_field"><label class="__ss_label">身份名称</label>
+              <input class="__ss_input" type="text" id="sIdentity" value="JOYCE MOORE" maxlength="64">
+              <div class="__ss_hint">终幕「欢迎 xxx 访问 / WELCOME, XXX」里的 xxx，也出现在第二步的身份卡上。</div>
+            </div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">身份编号</label><input class="__ss_input __ss_inputMono" type="text" id="sId" value="0087"><div class="__ss_hint">显示在身份卡上，建议用数字编号（如 0087）。</div></div>
+              <div class="__ss_field"><label class="__ss_label">权限等级</label><input class="__ss_input __ss_inputMono" type="text" id="sLevel" value="3"></div>
+            </div>
+          </div>
+
+          <div class="__ss_group">
+            <div class="__ss_groupTitle">交互</div>
+            <label class="__ss_check"><input type="checkbox" checked id="sInteract"><span class="__ss_checkText"><span>需要人工确认</span><span class="__ss_hint">第 1、2 步停下来等按钮 / Enter / 空格；关闭则整段自动播放。</span></span></label>
+            <label class="__ss_check"><input type="checkbox" checked id="sSkip"><span class="__ss_checkText"><span>允许跳过</span><span class="__ss_hint">右上角显示 SKIP，按 Esc 也能直接进主界面。</span></span></label>
+            <label class="__ss_check"><input type="checkbox" id="sSound"><span class="__ss_checkText"><span>音效</span><span class="__ss_hint">默认关闭；开启后交互确认时有轻微电子音。</span></span></label>
+          </div>
+
+          <div class="__ss_group">
+            <div class="__ss_groupTitle">视觉</div>
+            <div class="__ss_field"><label class="__ss_label">主题</label>
+              <select class="__ss_select" id="sTheme">
+                <option value="light" selected>浅色 · 暖白档案底板（参考片原色）</option>
+                <option value="dark">深色 · 暗底板</option>
+              </select>
+            </div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">强调色 · 橙</label><div class="__ss_row"><input class="__ss_swatch" type="color" value="#ff7500" id="sAccent"><span class="__ss_status">#ff7500</span></div></div>
+              <div class="__ss_field"><label class="__ss_label">故障色 · 蓝</label><div class="__ss_row"><input class="__ss_swatch" type="color" value="#2971b8" id="sGlitch"><span class="__ss_status">#2971b8</span></div></div>
+            </div>
+          </div>
+
+          <div class="__ss_group">
+            <div class="__ss_groupTitle">文案</div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">左上 · 主标题</label><input class="__ss_input" type="text" value="DEEPSEEK" id="sBrand1"></div>
+              <div class="__ss_field"><label class="__ss_label">左上 · 产品行</label><div class="__ss_row"><input class="__ss_input" type="text" value="HARNESS" id="sBrand3a" style="flex:1"><span class="__ss_status">+</span><input class="__ss_input" type="text" value="OS" id="sBrand3b" style="flex:0 0 60px"></div></div>
+            </div>
+            <div class="__ss_field"><label class="__ss_label">左上 · 副标题</label><input class="__ss_input" type="text" value="SYNTHESIZE INTELLIGENCE" maxlength="40" id="sBrand2"></div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">黑幕 · 中文</label><input class="__ss_input" type="text" value="深度求索" id="sOrgZh"></div>
+              <div class="__ss_field"><label class="__ss_label">黑幕 · 英文</label><input class="__ss_input __ss_inputMono" type="text" value="DEEPSEEK" id="sOrgEn"></div>
+            </div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">黑幕 · 小字</label><input class="__ss_input __ss_inputMono" type="text" value="DEEPSEEK HARNESS" id="sOrgSub"></div>
+              <div class="__ss_field"><label class="__ss_label">终幕 · 黑框</label><input class="__ss_input" type="text" value="DEEPSEEK HARNESS" id="sWelcomeBox"></div>
+            </div>
+            <div class="__ss_field"><label class="__ss_label">右下 · 页脚</label><input class="__ss_input __ss_inputMono" type="text" value="POWERED BY DEEPSEEK" id="sFooter"></div>
+          </div>
+
+          <div class="__ss_preview">
+            <div class="__ss_previewText">预览会按当前「已保存」的配置重播一次。<br><span style="opacity:.75">配置文件：C:\Users\&lt;you&gt;\.dsh\dsh-startup.json</span></div>
+            <button class="__ss_btn" id="sPreview" type="button">立即预览</button>
+          </div>
+
+          <div class="__ss_actions">
+            <button class="__ss_btn __ss_btnPrimary" id="sSave" type="button">保存</button>
+            <button class="__ss_btn" id="sReset" type="button">恢复默认</button>
+            <button class="__ss_btn" id="sReload" type="button">放弃修改</button>
+            <span class="__ss_status" id="sNotice"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function applyConfig() {
+    var c = window.__DSH_STARTUP__;
+    c.identity = $('fIdentity').value || 'JOYCE MOORE';
+    c.identityId = $('fId').value || '';
+    c.accessLevel = $('fLevel').value || '3';
+    c.theme = $('fTheme').value;
+    c.speed = Number($('fSpeed').value);
+    c.requireInteraction = $('fInteract').checked;
+    c.allowSkip = $('fSkip').checked;
+    c.voice = $('fVoice').checked;
+    c.voiceLang = $('fVoiceLang').value;
+    c.voiceName = $('fVoiceName').value;
+    c.voiceCue = $('fVoiceCue').checked;
+    c.voiceLead = Number($('fVLead').value);
+    $('fVLeadVal').textContent = c.voiceLead + ' ms';
+    c.voiceRate = Number($('fVRate').value);
+    c.voicePitch = Number($('fVPitch').value);
+    c.voiceCue = $('fVoiceCue').checked;
+    c.sound = $('fSound').checked;
+    $('fSpeedVal').textContent = Number(c.speed).toFixed(2) + '×';
+    $('fVRateVal').textContent = Number(c.voiceRate).toFixed(2) + '×';
+    $('fVPitchVal').textContent = Number(c.voicePitch).toFixed(2);
+  }
+
+  function replay() {
+    applyConfig();
+    if (window.__DSH_STARTUP_API__ && window.__DSH_STARTUP_API__.replay) {
+      window.__DSH_STARTUP_API__.replay();
+    }
+  }
+
+  /* 控制台里输完立刻生效需要重播；这里做成"改完点重播"，避免打字打到一半动画重启 */
+  ['fIdentity', 'fId', 'fLevel', 'fTheme', 'fSpeed', 'fInteract', 'fSkip'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      // 只更新显示，不打断正在播放的动画
+      $('fSpeedVal').textContent = Number($('fSpeed').value).toFixed(2) + '×';
+    });
+  });
+
+  /* ── 音色列表（女声排前面）+ 试听 ──────────────────────────────────── */
+  var NATURAL_HINTS = ['natural','neural','online','premium','enhanced','siri','google'];
+  var FEMALE_HINTS = ['aria','jenny','michelle','emma','ava','libby','sonia','maisie',
+    'zira','samantha','karen','moira','tessa','victoria','serena','allison','susan','fiona','hazel','female','woman',
+    'xiaoxiao','xiaoyi','xiaomo','huihui','yaoyao','晓晓','晓伊','女声'];
+  var MALE_HINTS = ['david','mark','guy','ryan','george','daniel','alex','fred','male','yunxi','yunjian','kangkang'];
+  function hits(n, list) { for (var i = 0; i < list.length; i++) { if (n.indexOf(list[i]) !== -1) return true; } return false; }
+  function readVoices() {
+    try {
+      var ss = window.speechSynthesis;
+      if (!ss || !ss.getVoices) return [];
+      var list = (ss.getVoices() || []).map(function (v, i) {
+        var n = String(v.name || '').toLowerCase();
+        var sc = (hits(n, NATURAL_HINTS) ? 60 : 0) + (hits(n, FEMALE_HINTS) ? 40 : 0)
+          - (hits(n, MALE_HINTS) ? 45 : 0) + (String(v.lang || '').indexOf('en') === 0 ? 25 : 0);
+        return { v: v, sc: sc, i: i };
+      });
+      list.sort(function (a, b) { return a.sc !== b.sc ? b.sc - a.sc : a.i - b.i; });
+      return list.map(function (x) { return x.v; });
+    } catch (e) { return []; }
+  }
+  function fillVoices() {
+    var sel = document.getElementById('fVoiceName'), cur = sel.value;
+    var list = readVoices();
+    sel.innerHTML = '<option value="">自动（优先女声）</option>';
+    list.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.name;
+      var ln = String(v.name || '').toLowerCase();
+      o.textContent = (hits(ln, NATURAL_HINTS) ? '★ ' : (hits(ln, FEMALE_HINTS) ? '♀ ' : '')) + v.name + ' · ' + (v.lang || '');
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+    document.getElementById('voiceNote').textContent =
+      list.length ? ('本机 ' + list.length + ' 个音色') : '读不到音色';
+  }
+  fillVoices();
+  try {
+    if (window.speechSynthesis && window.speechSynthesis.addEventListener) {
+      window.speechSynthesis.addEventListener('voiceschanged', fillVoices);
+    }
+  } catch (e) {}
+  setTimeout(fillVoices, 600);
+
+  function speakSample() {
+    try {
+      var ss = window.speechSynthesis;
+      if (!ss) return;
+      ss.cancel();
+      var lang = document.getElementById('fVoiceLang').value;
+      var u = new SpeechSynthesisUtterance(lang === 'zh' ? '需要访问许可，验证通过。' : 'Access permission required.');
+      var name = document.getElementById('fVoiceName').value;
+      var list = readVoices();
+      for (var i = 0; i < list.length; i++) { if (list[i].name === name) { u.voice = list[i]; u.lang = list[i].lang; } }
+      if (lang === 'zh' && !name) u.lang = 'zh-CN';
+      u.rate = Number(document.getElementById('fVRate').value);
+      u.pitch = Number(document.getElementById('fVPitch').value);
+      ss.speak(u);
+    } catch (e) {}
+  }
+  document.getElementById('btnSample').addEventListener('click', function (e) {
+    e.stopPropagation();
+    speakSample();
+  });
+  document.getElementById('btnAiPreset').addEventListener('click', function (e) {
+    e.stopPropagation();
+    document.getElementById('fVRate').value = 0.88;
+    document.getElementById('fVPitch').value = 0.85;
+    document.getElementById('fVoiceName').value = '';
+    document.getElementById('fVoiceCue').checked = true;
+    document.getElementById('fVLead').value = 240;
+    document.getElementById('fVRateVal').textContent = '0.88×';
+    document.getElementById('fVPitchVal').textContent = '0.85';
+    document.getElementById('fVLeadVal').textContent = '240 ms';
+    speakSample();
+  });
+
+  $('btnReplay').addEventListener('click', replay);
+  $('btnSkip').addEventListener('click', function () {
+    if (window.__DSH_STARTUP_API__ && window.__DSH_STARTUP_API__.skip) window.__DSH_STARTUP_API__.skip();
+  });
+  $('btnCollapse').addEventListener('click', function () {
+    var box = $('console');
+    box.classList.toggle('collapsed');
+    this.textContent = box.classList.contains('collapsed') ? '展开' : '收起';
+  });
+
+  /* 控制台里的输入不该顺带触发启动动画的 Enter 确认 */
+  $('console').addEventListener('keydown', function (e) { e.stopPropagation(); });
+
+  /* ── 设置面板模拟 ───────────────────────────────────────────────────── */
+  function openSettings() { $('settingsMock').classList.add('open'); }
+  function closeSettings() { $('settingsMock').classList.remove('open'); }
+  $('btnSettings').addEventListener('click', openSettings);
+  $('btnCloseSettings').addEventListener('click', closeSettings);
+  $('settingsMock').addEventListener('click', function (e) {
+    if (e.target === $('settingsMock')) closeSettings();
+  });
+  $('settingsMock').addEventListener('keydown', function (e) { e.stopPropagation(); });
+
+  /* 设置面板里的"立即预览"：关掉弹窗 + 按面板里的值重播 */
+  function pullFromSettings() {
+    $('fIdentity').value = $('sIdentity').value;
+    $('fId').value = $('sId').value;
+    $('fLevel').value = $('sLevel').value;
+    $('fTheme').value = $('sTheme').value;
+    $('fSpeed').value = $('sSpeed').value;
+    $('fInteract').checked = $('sInteract').checked;
+    $('fSkip').checked = $('sSkip').checked;
+    applyConfig();
+  }
+  $('sIdentity').addEventListener('input', function () { $('fIdentity').value = this.value; });
+  $('sSpeed').addEventListener('input', function () {
+    $('sSpeedVal').textContent = Number(this.value).toFixed(2) + '×';
+    $('fSpeed').value = this.value;
+    $('fSpeedVal').textContent = Number(this.value).toFixed(2) + '×';
+  });
+  $('sPreview').addEventListener('click', function () { pullFromSettings(); closeSettings(); replay(); });
+  $('sSave').addEventListener('click', function () {
+    pullFromSettings();
+    $('sNotice').textContent = '已保存（离线预览不落盘）。正式插件里写 ~/.dsh/dsh-startup.json。';
+  });
+  $('sReload').addEventListener('click', function () { $('sNotice').textContent = '已放弃修改。'; });
+  $('sReset').addEventListener('click', function () {
+    $('sIdentity').value = 'JOYCE MOORE'; $('sId').value = '0087';
+    $('sLevel').value = '3'; $('sTheme').value = 'light';
+    $('sSpeed').value = 1; $('sSpeedVal').textContent = '1.00×';
+    $('sInteract').checked = true; $('sSkip').checked = true; $('sSound').checked = false;
+    $('sBrand1').value = 'DEEPSEEK'; $('sBrand2').value = 'SYNTHESIZE INTELLIGENCE';
+    $('sBrand3a').value = 'HARNESS'; $('sBrand3b').value = 'OS';
+    $('sOrgZh').value = '深度求索'; $('sOrgEn').value = 'DEEPSEEK';
+    $('sOrgSub').value = 'DEEPSEEK HARNESS'; $('sWelcomeBox').value = 'DEEPSEEK HARNESS';
+    $('sFooter').value = 'POWERED BY DEEPSEEK';
+    $('sNotice').textContent = '已恢复默认。';
+  });
+
+  /* 动画播完后控制台不遮住画面：挪到右下 */
+  window.addEventListener('dsh-startup:done', function () {
+    $('console').style.top = 'auto';
+    $('console').style.bottom = '16px';
+  });
+
+  /* Esc 交给启动动画处理跳过，这里不抢 */
+})();
+</script>
+</body>
+</html>

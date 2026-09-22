@@ -1,0 +1,12 @@
+# dsh-startup-screen — DSH bundle patch
+#
+# 把插件的 Host 半侧挂进当前 profile 的配置树；Web 半侧由 dsh.client 声明，
+# 宿主按 package.json 的 dsh.client 自动组装 bundle，这里不用写。
+#
+# 安装（不手改 profile patch）：
+#   dsh plugin --profile web add dsh-startup-screen
+# 本地开发安装：
+#   dsh plugin --profile web add link:D:\工作区\插件\dsh-startup-screen
+- insert:
+    - id: dsh-startup-screen
+      name: dsh-startup-screen
