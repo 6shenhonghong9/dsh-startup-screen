@@ -64,6 +64,7 @@ const CFG = {
   welcomeBox: 'DEEPSEEK HARNESS', footer: 'POWERED BY DEEPSEEK',
   accent: '#ff7500', glitchA: '#ff3b30', glitchB: '#2971b8',
 }
+let versionInResponse = '9.9.9'
 const requests = []
 const fetchStub = (url, init) => {
   requests.push({ url, init })
@@ -74,8 +75,8 @@ const fetchStub = (url, init) => {
   else if (body && body.patch) config = Object.assign({}, CFG, body.patch)
   return Promise.resolve({
     json: () => Promise.resolve(isPost
-      ? { ok: true, config, defaults: CFG }
-      : { ok: true, config, defaults: CFG, file: 'C:\\\\Users\\\\x\\\\.dsh\\\\dsh-startup.json' }),
+      ? { ok: true, version: versionInResponse, config, defaults: CFG }
+      : { ok: true, version: versionInResponse, config, defaults: CFG, file: 'C:\\\\Users\\\\x\\\\.dsh\\\\dsh-startup.json' }),
   })
 }
 
@@ -152,6 +153,13 @@ check('GET /dsh-startup/config 被调用', requests.some((r) => r.url === '/dsh-
 const texts = walk(tree).filter((n) => typeof n.props.children === 'string').map((n) => n.props.children)
 check('渲染出「身份名称」字段', texts.includes('身份名称'), texts.slice(0, 12).join('/'))
 check('渲染出「身份编号」字段', texts.includes('身份编号'))
+
+/* 面板顶部：原来的大段说明已移除，改成版本号 */
+const versionNode = find(tree, (n) => n.props && n.props.className === '__ss_version')
+check('顶部渲染出版本号节点 __ss_version', !!versionNode, versionNode && String(versionNode.props.children))
+check('版本号取自 /dsh-startup/config 返回的 version', versionNode && versionNode.props.children === '版本 v9.9.9', versionNode && String(versionNode.props.children))
+check('已删除原来那段「启动界面：黑幕…」说明', !JSON.stringify(tree).includes('启动界面：'), '')
+check('已删除 __ss_lead 样式类', !JSON.stringify(tree).includes('__ss_lead'), '')
 check('渲染出「权限等级」字段', texts.includes('权限等级'))
 const idInput = find(tree, (n) => n.type === 'input' && n.props.type === 'text' && n.props.value === 'JOYCE MOORE')
 check('身份名称输入框回填了当前配置', !!idInput, idInput && idInput.props.value)

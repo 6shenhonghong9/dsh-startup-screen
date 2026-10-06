@@ -1,11 +1,12 @@
 {
   "name": "dsh-startup-screen",
-  "version": "1.0.0",
-  "description": "DeepSeek Harness 启动界面与启动动画：黑幕 DeepSeek 标识 → 过曝洗白 → 暖白档案底板 → 交互式访问授权序列（需要访问许可 / 身份资料确认 / 接收访问需求 / 开始读取权限 / 读取完毕·核验通过 / 欢迎访问）。中文主字 + 英文等宽副标题，真声素材 + 界面音效，身份名称等参数在 DSH 设置页可改。",
+  "version": "1.1.0",
+  "description": "DeepSeek Harness 启动界面与启动动画：黑幕 DeepSeek 标识 → 过曝洗白 → 暖白档案底板 → 交互式访问授权序列（需要访问许可 / 身份资料确认 / 接收访问需求 / 开始读取权限 / 读取完毕·核验通过 / 欢迎访问）。中文主字 + 英文等宽副标题，真声素材 + 界面音效，身份名称等参数在 DSH 设置页可改。web profile 与 DeepSeek Harness Desktop 桌面端通用。",
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
+    "deepseek-harness-desktop",
     "startup",
     "splash",
     "boot-animation"
@@ -23,14 +24,16 @@
     "preview/index.html",
     "open-preview.sh",
     "打开预览.cmd",
+    "安装.cmd",
     "cordis.patch.yml",
     "README.md",
     "INSTALL.md",
+    "DESKTOP.md",
     "AUDIO-FIELDS.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/smoke-host.mjs && node test/smoke-splash.mjs && node test/smoke-client.mjs"
+    "test": "node test/smoke-host.mjs && node test/smoke-splash.mjs && node test/smoke-client.mjs && node test/smoke-desktop-boot.mjs"
   },
   "license": "MIT",
   "engines": {

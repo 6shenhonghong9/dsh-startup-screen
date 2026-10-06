@@ -161,6 +161,7 @@ check('GET config ok', cfg.ok === true)
 check('默认身份名称 = JOYCE MOORE', cfg.config.identity === 'JOYCE MOORE', cfg.config.identity)
 check('默认身份编号 = 0087', cfg.config.identityId === '0087', cfg.config.identityId)
 check('返回了配置文件路径', typeof cfg.file === 'string' && cfg.file.startsWith(SMOKE_HOME), cfg.file)
+check('返回了插件版本号（设置面板顶部要显示它）', typeof cfg.version === 'string' && /^\d+\.\d+\.\d+/.test(cfg.version), cfg.version)
 
 r = await call('exact /dsh-startup/config', 'POST', JSON.stringify({ patch: { identity: '琉璃', speed: 99, enabled: 'true' } }))
 cfg = JSON.parse(r.body)
@@ -209,6 +210,10 @@ check('注入了首屏兜底 <style>', after.includes('id="dsh-startup-critical"
 check('注入了挂载点 div', after.includes('<div id="dsh-startup-root" class="dsu-root dsu-boot">'))
 check('注入了 window.__DSH_STARTUP__ 配置', /^\{"enabled":/.test(inlinePayload(after)), inlinePayload(after).slice(0, 60))
 check('内联载荷是合法 JSON', (() => { try { JSON.parse(inlinePayload(after)); return true } catch { return false } })())
+/* 设置面板顶部的版本号：Host 从自己的 package.json 读出来，再交给浏览器半侧 */
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf8')).version
+check('注入了 window.__DSH_STARTUP_VERSION__', after.includes('window.__DSH_STARTUP_VERSION__='), '')
+check('注入的版本号 = package.json 的 version', after.includes('window.__DSH_STARTUP_VERSION__=' + JSON.stringify(pkgVersion)), pkgVersion)
 check('注入了 defer 运行时脚本', after.includes('<script defer src="/dsh-startup/splash.js"></script>'))
 check('配置落在 </head> 之前', after.indexOf('dsh-startup-critical') < after.indexOf('</head>'))
 check('挂载点紧跟 <body>', /<body>\s*<div id="dsh-startup-root"/.test(after))
