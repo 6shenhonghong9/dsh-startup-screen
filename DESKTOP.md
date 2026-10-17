@@ -94,24 +94,37 @@ then fully quit it before running dsh plugin --profile desktop.
 
 ---
 
-## 四、验证情况（请如实看待）
+## 四、验证情况
 
 | 验证项 | 状态 |
 |---|---|
-| 四套冒烟测试（193 项断言） | ✅ 通过 |
+| 四套冒烟测试（214 项断言） | ✅ 通过 |
 | 真实 `dist/index.html` 上的注入产物 | ✅ 通过（隔离环境实测） |
 | 隔离 DSH 实例的真实 HTTP 全链路（index 注入 / 三条路由 / 7 段音频素材 / 配置读写 / 401 信任栅栏） | ✅ 通过 |
 | 没有 `webServer` 的降级路径不抛异常 | ✅ 通过 |
 | 浏览器半侧自举逻辑（DOM stub 跑真代码） | ✅ 通过 41 项断言 |
-| **桌面端实机**（真实 Electron 里看到动画） | ⚠️ **未实机验证** |
+| **桌面端实机**（真实 Electron 里看到完整动画） | ✅ **通过** |
 
-最后一行的原因：写这份适配时开发机上没有装 DeepSeek Harness Desktop
-（`%LOCALAPPDATA%\Programs\DeepSeek Harness Desktop` 不存在，
-`profiles\desktop` 里只剩指向它的失效联接），无法启动桌面端做端到端确认。
+桌面端实测（DeepSeek Harness Desktop，内核 `0.2.0-rc.2`）：
 
-因此桌面端用的是「**双保险**」设计：`tapIndex` 能用就走和 web 完全相同的路径，
-不能用就走浏览器半侧自举。两条路都有测试覆盖，但**真机表现**需要你自己打开
-桌面端确认一次。
+- 六幕动画完整播放，无白闪、无残留黑幕
+- 8 段音频全部走 `lib/assets/` 的真声素材，未回落 TTS
+- 设置页出现「启动动画」，配置正确落在 `%USERPROFILE%\.dsh\dsh-startup.json`
+- 三条路由 `/dsh-startup/splash.js`、`/dsh-startup/splash.css`、`/dsh-startup/config`
+  由安装前的 **404** 变为 **401**（401 是插件自己的信任栅栏，说明路由已注册）
+- 桌面端组合里确实有 `webServer`，所以 Host 半侧的降级分支没有触发
+
+### 想知道走的是哪条路？
+
+两条路在用户侧表现一致，差异只在一个标记上。桌面端开发者工具 Console 里读：
+
+```js
+window.__DSH_STARTUP_BOOT__   // 'index' = Host 的 tapIndex 注入；'client' = 浏览器半侧自举
+```
+
+旁证：`document.getElementById('dsh-startup-critical')` 与 `window.__DSH_STARTUP_VERSION__`
+只在注入路径存在；网络面板里 `splash.js` 带 `?t=<时间戳>` 的是自举（或手动 `replay()`），
+注入走的则是无查询串的 `splash.js`。
 
 如果装上后没看到动画，按这个顺序排查：
 
@@ -134,7 +147,7 @@ then fully quit it before running dsh plugin --profile desktop.
 ## 五、测试
 
 ```bash
-npm test     # host + splash + client + desktop 四套，193 项断言
+npm test     # host + splash + client + desktop 四套，214 项断言
 ```
 
 `test/smoke-desktop-boot.mjs` 就是桌面端自举那 41 项断言的所在：
