@@ -19,7 +19,7 @@
 ```bash
 # 1) 先完全退出 DeepSeek Harness Desktop（进程不要留着）
 # 2) 再装
-dsh plugin --profile desktop add ./dsh-startup-screen-1.1.0.tgz
+dsh plugin --profile desktop add ./dsh-startup-screen-1.1.1.tgz
 # 3) 重新打开桌面端
 ```
 

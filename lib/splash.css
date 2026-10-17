@@ -424,13 +424,18 @@
   opacity: 0.5;
 }
 
-/* 右侧等宽信息行（对应参考片 "· ID CONFIRMED : JOYC"） */
+/* 右下角等宽信息行（对应参考片 "· ID CONFIRMED : JOYC"）
+   挂在页脚正上方、右边缘与页脚对齐（页脚 right:46px / bottom:52px），
+   和左下角的声纹条左右对称。原定位紧贴居中大标题右侧，身份编号一长或窗口一窄
+   就会和版心文字叠字，只能靠 @media 在窄窗口整行藏掉 —— 挪出版心后，碰撞在
+   几何上不再可能，窄窗口也就不必再牺牲这条读数。 */
 .dsu-idline {
   position: absolute;
-  left: calc(50% + 190px);
-  top: 49%;
-  transform: translateY(-50%) translateX(16px);
+  right: 46px;
+  bottom: 104px;
+  transform: translateX(16px);
   z-index: 22;
+  text-align: right;
   font-family: var(--dsu-mono);
   font-size: 12px;
   letter-spacing: 0.2em;
@@ -440,7 +445,7 @@
   transition-delay: 520ms;
   white-space: nowrap;
 }
-.dsu-idline.dsu-in { opacity: 1; transform: translateY(-50%); }
+.dsu-idline.dsu-in { opacity: 1; transform: none; }
 
 /* ── 环形准星（验证通过）───────────────────────────────────────────────── */
 /* 照原片：环居中、直径约 56vw，状态字就落在环心里，两者是一个整体。
@@ -1089,11 +1094,6 @@
 @keyframes dsu-voice {
   0%, 100% { height: 20%; }
   50% { height: 100%; }
-}
-
-/* 窄窗口里右侧那行等宽小字会和环撞上，直接收掉 */
-@media (max-width: 1180px) {
-  .dsu-idline { display: none; }
 }
 
 /* 无障碍：尊重系统"减少动态效果" */

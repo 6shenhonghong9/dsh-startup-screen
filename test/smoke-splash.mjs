@@ -318,6 +318,23 @@ console.log('\n[8] 终幕用真声欢迎语（来自 Video Project 3 的 line-6�
   check('总共 6 份人声素材被引用', (src.match(/'line-[1-6]'/g) || []).length >= 6)
 }
 
+console.log('\n[9] 右下角身份读数：不压版心、窄窗口不丢、第 3 幕随身份核验退场')
+{
+  const css = fs.readFileSync(fileURLToPath(new URL('../lib/splash.css', import.meta.url)), 'utf8')
+  const src = fs.readFileSync(BUNDLE, 'utf8')
+  const idlineRule = (css.match(/\.dsu-idline\s*\{[^}]*\}/) || [''])[0]
+  check('.dsu-idline 用 right/bottom 锚定（脱离居中版心）', /right:\s*46px/.test(idlineRule) && /bottom:\s*104px/.test(idlineRule), idlineRule.slice(0, 80))
+  check('.dsu-idline 不再用 left: calc(50% + 190px)', !/left:\s*calc\(50% \+ 190px\)/.test(idlineRule))
+  check('.dsu-idline 不再用 top: 49%', !/top:\s*49%/.test(idlineRule))
+  check('.dsu-idline 无 translateY(-50%)（不再垂直居中）', !/translateY\(-50%\)/.test(idlineRule))
+  check('.dsu-idline 右对齐成独立读数', /text-align:\s*right/.test(idlineRule))
+  check('.dsu-idline.dsu-in 落到 transform: none', /\.dsu-idline\.dsu-in\s*\{[^}]*transform:\s*none/.test(css))
+  check('窄窗口不再藏掉身份读数（无 display:none 规则）', !/\.dsu-idline\s*\{\s*display:\s*none/.test(css))
+  check('那条 @media(max-width:1180px) 兜底已移除', !/1180px/.test(css))
+  check('第 3 幕起（i >= 2）就收掉身份读数', /if \(i >= 2\) ui\.idline\.classList\.remove\('dsu-in'\)/.test(src))
+  check('退场只发生在 stepLoop 开场与 finale 两处', (src.match(/ui\.idline\.classList\.remove\('dsu-in'\)/g) || []).length === 2)
+}
+
 console.log('\n============================')
 console.log(`  通过 ${pass} / 失败 ${fail}`)
 console.log('============================\n')
