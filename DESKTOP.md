@@ -19,7 +19,7 @@
 ```bash
 # 1) 先完全退出 DeepSeek Harness Desktop（进程不要留着）
 # 2) 再装
-dsh plugin --profile desktop add ./dsh-startup-screen-1.1.1.tgz
+dsh plugin --profile desktop add ./dsh-startup-screen-1.1.2.tgz
 # 3) 重新打开桌面端
 ```
 
@@ -52,6 +52,22 @@ then fully quit it before running dsh plugin --profile desktop.
 |---|---|---|
 | 注入方式 | `ctx.webServer.tapIndex` 改写 index.html | 同上；若该载体不提供 index 注入，则由浏览器半侧自举 |
 | 首屏黑幕 | 应用挂载前就盖住，无白闪 | 走 index 注入时同 web；走自举时会有极短白闪（见下） |
+
+### 桌面端标题栏（Windows）
+
+桌面端用 `titleBarOverlay`（Windows Controls Overlay）画最小化 / 最大化 / 关闭三个按钮，
+其底色跟随应用主题。启动动画第一幕是纯黑、第二幕是暖白档案底板，于是右上角会留一块
+与应用主题同色的方块 —— 黑幕阶段像一条亮带，暖白底板阶段三个深色图标压在浅色块上。
+
+从 1.1.2 起，播放期间把这层 overlay **整层透明化**：插件把桌面端 preload 用来测色的
+隐藏探针改成 `rgba(0, 0, 0, 0)`，逼它发出
+`setTitleBarOverlay({ color: rgba(0,0,0,0), symbolColor: rgba(0,0,0,0) })` ——
+色块与按钮图标一起消失，启动界面直接透上来，任何一幕都天然无缝。
+揭幕 / 跳过 / 自举失败 / 9 秒兜底都会还原；另有 60 秒硬上限，绝不会把按钮永久藏住。
+
+- 生效范围：**仅 Windows 桌面端**（`dsh-app:` 协议或带 `data-windows-titlebar` 标记 + UA 含 `Win`）
+- 浏览器与 macOS：整段空转，不碰任何样式
+- 依赖失效（桌面端改了 preload 实现）时**静默降级**：标题栏保持原样，动画不受影响
 
 ### 具体改了什么
 
@@ -98,7 +114,7 @@ then fully quit it before running dsh plugin --profile desktop.
 
 | 验证项 | 状态 |
 |---|---|
-| 四套冒烟测试（214 项断言） | ✅ 通过 |
+| 四套冒烟测试（227 项断言） | ✅ 通过 |
 | 真实 `dist/index.html` 上的注入产物 | ✅ 通过（隔离环境实测） |
 | 隔离 DSH 实例的真实 HTTP 全链路（index 注入 / 三条路由 / 7 段音频素材 / 配置读写 / 401 信任栅栏） | ✅ 通过 |
 | 没有 `webServer` 的降级路径不抛异常 | ✅ 通过 |
@@ -147,7 +163,7 @@ window.__DSH_STARTUP_BOOT__   // 'index' = Host 的 tapIndex 注入；'client' =
 ## 五、测试
 
 ```bash
-npm test     # host + splash + client + desktop 四套，214 项断言
+npm test     # host + splash + client + desktop 四套，227 项断言
 ```
 
 `test/smoke-desktop-boot.mjs` 就是桌面端自举那 41 项断言的所在：

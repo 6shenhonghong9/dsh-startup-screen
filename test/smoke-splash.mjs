@@ -32,7 +32,18 @@ function makeEl(tag) {
     _cls: '',
     _text: '',
     _html: '',
-    style: { setProperty() {}, removeProperty() {} },
+    /* 记录型 style：chromeSync 会读写内联属性，这里要能断言"设过 / 还原了" */
+    style: (() => {
+      const map = new Map()
+      return {
+        _map: map,
+        setProperty(k, v) { map.set(String(k), String(v)) },
+        removeProperty(k) { map.delete(String(k)) },
+        getPropertyValue(k) { return map.get(String(k)) || '' },
+        get backgroundColor() { return map.get('background-color') || '' },
+        set backgroundColor(v) { map.set('background-color', String(v)) },
+      }
+    })(),
     dataset: {},
     children: [],
     hidden: false,
@@ -43,6 +54,7 @@ function makeEl(tag) {
     removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c },
     setAttribute() {},
     getAttribute() { return null },
+    hasAttribute() { return false },
     addEventListener() {},
     removeEventListener() {},
     dispatchEvent() {},
@@ -120,11 +132,12 @@ function makeSpeech() {
   }
 }
 
-function run(withSpeech, cfgOverride) {
+function run(withSpeech, cfgOverride, env) {
   MARKUP = ''
   MISSED.clear()
   lookupCache.clear()
   spoken.length = 0
+  const E = env || {}
 
   const root = makeEl('div')
   root._cls = 'dsu-root dsu-boot'
@@ -139,7 +152,8 @@ function run(withSpeech, cfgOverride) {
     getElementById: (id) => (id === 'dsh-startup-root' ? root : null),
     createElement: (t) => makeEl(t),
     createElementNS: (_ns, t) => makeEl(t),
-    querySelector: () => null,
+    querySelector: (sel) => (E.probe && /span/.test(String(sel)) ? E.probe : null),
+    querySelectorAll: (sel) => (E.probe && /span/.test(String(sel)) ? [E.probe] : []),
     addEventListener() {},
     removeEventListener() {},
   }
@@ -169,7 +183,12 @@ function run(withSpeech, cfgOverride) {
         createBiquadFilter() { return { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect() {} } },
       }
     },
-    location: { host: '127.0.0.1:3080', href: 'http://127.0.0.1:3080/' },
+    location: {
+      host: '127.0.0.1:3080',
+      href: (E.protocol || 'http:') + '//127.0.0.1:3080/',
+      protocol: E.protocol || 'http:',
+    },
+    navigator: { userAgent: E.userAgent || 'Mozilla/5.0 (X11; Linux x86_64)' },
     addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
     sessionStorage: { getItem: () => null, setItem() {} },
     localStorage: { getItem: () => null, setItem() {} },
@@ -201,6 +220,14 @@ function run(withSpeech, cfgOverride) {
     window: windowStub,
     document: documentStub,
     console,
+    /* chromeSync 用 getComputedStyle 判断探针是否已真的透明 */
+    getComputedStyle: (el) => ({
+      get backgroundColor() {
+        const v = el && el.style ? el.style.getPropertyValue('background-color') : ''
+        return v || (E.computedBg || 'rgb(27, 27, 28)')
+      },
+    }),
+    MutationObserver: E.MutationObserver,
     Promise, Object, Array, JSON, String, Number, Math, Date, Error, RegExp, isFinite,
     setTimeout: windowStub.setTimeout,
     clearTimeout: windowStub.clearTimeout,
@@ -333,6 +360,58 @@ console.log('\n[9] 右下角身份读数：不压版心、窄窗口不丢、第 
   check('那条 @media(max-width:1180px) 兜底已移除', !/1180px/.test(css))
   check('第 3 幕起（i >= 2）就收掉身份读数', /if \(i >= 2\) ui\.idline\.classList\.remove\('dsu-in'\)/.test(src))
   check('退场只发生在 stepLoop 开场与 finale 两处', (src.match(/ui\.idline\.classList\.remove\('dsu-in'\)/g) || []).length === 2)
+}
+
+console.log('\n[10] 桌面端标题栏同步：仅 Windows 桌面端生效、可还原、探针重挂能自愈')
+{
+  const CLEAR = 'rgba(0, 0, 0, 0)'
+  const mkProbe = () => {
+    const el = makeEl('span')
+    el.isConnected = true
+    el.style.setProperty('background-color', 'var(--dsw-specific-sidebar-fill)')
+    return el
+  }
+  const WIN_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+
+  /* ① 浏览器（web profile）：整段空转，绝不碰探针 */
+  let probe = mkProbe()
+  let env = { probe, protocol: 'http:', userAgent: WIN_UA }
+  let rr = run(true, {}, env)
+  let chrome = rr.windowStub.__DSH_STARTUP_CHROME__
+  check('暴露了 __DSH_STARTUP_CHROME__ 把手', !!chrome && typeof chrome.hide === 'function' && typeof chrome.show === 'function')
+  check('浏览器环境判定为非桌面端', chrome.isDesktopWin() === false)
+  check('浏览器环境不动探针底色', probe.style.getPropertyValue('background-color') === 'var(--dsw-specific-sidebar-fill)', probe.style.getPropertyValue('background-color'))
+
+  /* ② Windows 桌面端：hide 把探针与 token 一起钉成透明 */
+  probe = mkProbe()
+  env = { probe, protocol: 'dsh-app:', userAgent: WIN_UA }
+  rr = run(true, {}, env)
+  chrome = rr.windowStub.__DSH_STARTUP_CHROME__
+  const de = rr.sandbox.document.documentElement
+  check('Windows 桌面端判定成立', chrome.isDesktopWin() === true)
+  check('探针底色被钉成全透明', probe.style.getPropertyValue('background-color') === CLEAR, probe.style.getPropertyValue('background-color'))
+  check('探针符号色也被钉透明（按钮图标不可见）', probe.style.getPropertyValue('color') === CLEAR)
+  check('html 上的 token 一并设成透明（双保险）', de.style.getPropertyValue('--dsw-specific-sidebar-fill') === CLEAR)
+
+  /* ③ 揭幕还原 */
+  chrome.show()
+  check('show() 清掉探针底色', probe.style.getPropertyValue('background-color') === '', JSON.stringify(probe.style.getPropertyValue('background-color')))
+  check('show() 清掉探针符号色', probe.style.getPropertyValue('color') === '')
+  check('show() 把 html token 也还原', de.style.getPropertyValue('--dsw-specific-sidebar-fill') === '')
+
+  /* ④ 探针被应用重挂：缓存节点脱离文档后应重新查找（P1） */
+  probe.isConnected = false
+  const probe2 = mkProbe()
+  env.probe = probe2
+  chrome.hide()
+  check('探针被重挂后能重新找到并继续生效', probe2.style.getPropertyValue('background-color') === CLEAR, probe2.style.getPropertyValue('background-color'))
+
+  /* ⑤ macOS 桌面端：UA 不含 Win，整段空转 */
+  const macProbe = mkProbe()
+  rr = run(true, {}, { probe: macProbe, protocol: 'dsh-app:', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' })
+  chrome = rr.windowStub.__DSH_STARTUP_CHROME__
+  check('macOS 判定为非 Windows 桌面端', chrome.isDesktopWin() === false)
+  check('macOS 不动探针', macProbe.style.getPropertyValue('background-color') === 'var(--dsw-specific-sidebar-fill)')
 }
 
 console.log('\n============================')

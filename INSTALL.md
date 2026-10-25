@@ -3,7 +3,7 @@
 ## 一、直接安装（推荐）
 
 ```bash
-dsh plugin --profile web add ./dsh-startup-screen-1.1.1.tgz
+dsh plugin --profile web add ./dsh-startup-screen-1.1.2.tgz
 ```
 
 Windows 上双击 `安装.cmd` 也一样。
