@@ -224,7 +224,12 @@ console.log('\n[1] Host 没注入（桌面端 file:// + IPC 形态）→ 自举'
   check('挂了 splash.js 运行时', !!script, script && script.src)
   check('splash.js 带时间戳绕缓存', script && /splash\.js\?t=\d+$/.test(String(script.src)), script && script.src)
   check('配置先落 window（splash.js 直接读它）', s.win.__DSH_STARTUP__ && s.win.__DSH_STARTUP__.identity === undefined && s.win.__DSH_STARTUP__.enabled === true, JSON.stringify(s.win.__DSH_STARTUP__))
-  check('session 模式回填了同款已播标记', s.win.sessionStorage.getItem('dsh-startup-screen:shown') === '1')
+  check('加载完成前不写已播标记（失败还能重试）', s.win.sessionStorage.getItem('dsh-startup-screen:shown') === null)
+  /* 样式与脚本都 load 成功之后才落标记 */
+  link.emit && link.emit('load')
+  script.emit && script.emit('load')
+  await settle()
+  check('样式与脚本都 load 后才回填已播标记', s.win.sessionStorage.getItem('dsh-startup-screen:shown') === '1')
   check('挂了 9 秒自愈定时器', s.timers.some((t) => t.ms === 9000), s.timers.map((t) => t.ms).join(','))
 }
 
@@ -283,7 +288,13 @@ console.log('\n[3] 不播的几种情况')
   const s = boot({ config: { enabled: true, mode: 'daily' } }); s.apply()
   await settle()
   const today = new Date().toISOString().slice(0, 10)
-  check('daily 模式首次播放 → 记下今天的日期', s.win.localStorage.getItem('dsh-startup-screen:day') === today, s.win.localStorage.getItem('dsh-startup-screen:day'))
+  check('daily 首次播放：加载完成前不写日期', s.win.localStorage.getItem('dsh-startup-screen:day') === null, s.win.localStorage.getItem('dsh-startup-screen:day'))
+  const dLink = tags(s, (e) => e.tagName === 'LINK')[0]
+  const dScript = tags(s, (e) => e.tagName === 'SCRIPT')[0]
+  dLink.emit && dLink.emit('load')
+  dScript.emit && dScript.emit('load')
+  await settle()
+  check('daily 加载成功后记下今天的日期', s.win.localStorage.getItem('dsh-startup-screen:day') === today, s.win.localStorage.getItem('dsh-startup-screen:day'))
   check('daily 模式不写 session 标记', s.win.sessionStorage.getItem('dsh-startup-screen:shown') === null)
 }
 

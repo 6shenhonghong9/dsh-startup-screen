@@ -19,7 +19,7 @@
 ```bash
 # 1) 先完全退出 DeepSeek Harness Desktop（进程不要留着）
 # 2) 再装
-dsh plugin --profile desktop add ./dsh-startup-screen-1.1.2.tgz
+dsh plugin --profile desktop add ./dsh-startup-screen-1.2.0.tgz
 # 3) 重新打开桌面端
 ```
 
@@ -78,6 +78,11 @@ then fully quit it before running dsh plugin --profile desktop.
    正常 APPLIED**，页面交给浏览器半侧。
 
 2. **浏览器半侧可以自举**（`lib/client.js`）
+
+   > 能力边界要说准：自举要拉的 `splash.css` / `splash.js` / `/dsh-startup/config`
+   > **三个都来自 Host 半侧注册的路由**，所以它只覆盖「webServer 在、但 `tapIndex` 的
+   > index 注入没生效」这一种形态。要是整个 webServer 都缺，自举也拿不到素材。
+   > 想覆盖那种形态，得让 Host 把 CSS/JS 内联进注入的 HTML。
    Host 的 index 注入没生效时，浏览器半侧自己建 `#dsh-startup-root`、加样式、
    挂 `splash.js` 并把启动动画放起来。判定全在 window 上，不猜宿主类型：
 
@@ -114,11 +119,11 @@ then fully quit it before running dsh plugin --profile desktop.
 
 | 验证项 | 状态 |
 |---|---|
-| 四套冒烟测试（227 项断言） | ✅ 通过 |
+| 四套冒烟测试（255 项断言） | ✅ 通过 |
 | 真实 `dist/index.html` 上的注入产物 | ✅ 通过（隔离环境实测） |
 | 隔离 DSH 实例的真实 HTTP 全链路（index 注入 / 三条路由 / 7 段音频素材 / 配置读写 / 401 信任栅栏） | ✅ 通过 |
 | 没有 `webServer` 的降级路径不抛异常 | ✅ 通过 |
-| 浏览器半侧自举逻辑（DOM stub 跑真代码） | ✅ 通过 41 项断言 |
+| 浏览器半侧自举逻辑（DOM stub 跑真代码） | ✅ 通过 44 项断言 |
 | **桌面端实机**（真实 Electron 里看到完整动画） | ✅ **通过** |
 
 桌面端实测（DeepSeek Harness Desktop，内核 `0.2.0-rc.2`）：
@@ -163,9 +168,21 @@ window.__DSH_STARTUP_BOOT__   // 'index' = Host 的 tapIndex 注入；'client' =
 ## 五、测试
 
 ```bash
-npm test     # host + splash + client + desktop 四套，227 项断言
+npm test     # host + splash + client + desktop 四套，255 项断言
 ```
 
-`test/smoke-desktop-boot.mjs` 就是桌面端自举那 41 项断言的所在：
+`test/smoke-desktop-boot.mjs` 就是桌面端自举那 47 项断言的所在：
 它把 `lib/client.js` 按 ModuleLoader 的方式跑起来，用最小 DOM stub 断言
 「Host 没注入时自举 / Host 注入过时不重复 / 该不播时不播 / 失败时把页面还回去」。
+
+---
+
+## 六、已知取舍
+
+三处刻意没做，原因写在下面（不是遗漏）：
+
+| 项 | 现状 | 为什么这样 |
+|---|---|---|
+| `peerDependencies` | 未声明 | DSH 的兼容性闸门只认 `peerDependencies` 里的 `@deepseek-ai/dsh*`。但当前内核版本号是 **预发布**（如 `0.2.1-rc.3`），semver 规定预发布版本只有在比较符里出现**同一 major.minor.patch 的预发布**时才匹配 —— 写成 `^0.2.0-rc.2` 会把 `0.2.1-rc.3` 判为不兼容，直接挡住安装。等内核发正式版再补这一条更稳。 |
+| 路由用绝对路径 `/dsh-startup/...` | 保留 | DSH 自己的 app 路由是 document-relative 的，但改成相对路径会在 SPA 深链接（`/c/<id>`）下解析到错误的位置。要两者兼得得先定清楚部署形态（是否挂反代子路径），目前按「根路径部署」处理：挂在 `/sub/` 下会 404。 |
+| `connection` 声明为硬依赖 | 保留 | 信任栅栏（`rejected()`）是「有就用、没有就放行」的软依赖，代码里保留了兜底分支；但把它声明成硬依赖能保证栅栏在第一个请求时就可用 —— 安全优先于「声明与容错一致」的形式美。 |

@@ -334,13 +334,14 @@ speech.cancelCalls = 0
 api.skip()
 check('按跳过时才真的掐断（cancel 1 次）', speech.cancelCalls === 1, 'cancel ' + speech.cancelCalls + ' 次')
 
-console.log('\n[8] 终幕用真声欢迎语（来自 Video Project 3 的 line-6）')
+console.log('\n[8] 终幕用 line-6 欢迎语（自制落幕词，3.73 秒）')
 {
   const src = fs.readFileSync(BUNDLE, 'utf8')
   check('全程没有 voice.tts( 调用（不再用 TTS 念白）', !/voice\.tts\(/.test(src))
   check('终幕挂了 line-6 素材', /voice\.line\(null, null, 'line-6'\)/.test(src))
+  check('五步念白用各自素材', /voice\.line\(step\.say, step\.zh, step\.audio\)/.test(src))
+  check('预加载包含五步与终幕', /ensureAsset\(STEPS\[i\]\.audio\)/.test(src) && /ensureAsset\('line-6'\)/.test(src))
   check('揭幕前会等欢迎语播完', /\.then\(function \(\) \{ return welcome \}\)/.test(src))
-  check('预加载包含 line-6', /ensureAsset\('line-6'\)/.test(src))
   check('五步仍然各自挂着真声素材', (src.match(/audio: 'line-/g) || []).length === 5)
   check('总共 6 份人声素材被引用', (src.match(/'line-[1-6]'/g) || []).length >= 6)
 }
@@ -412,6 +413,65 @@ console.log('\n[10] 桌面端标题栏同步：仅 Windows 桌面端生效、可
   chrome = rr.windowStub.__DSH_STARTUP_CHROME__
   check('macOS 判定为非 Windows 桌面端', chrome.isDesktopWin() === false)
   check('macOS 不动探针', macProbe.style.getPropertyValue('background-color') === 'var(--dsw-specific-sidebar-fill)')
+}
+
+console.log('\n[11] 终幕欢迎语：素材完整性与时序')
+{
+  const en = fs.readFileSync(fileURLToPath(new URL('../lib/assets/line-6.mp3', import.meta.url)))
+  check('line-6 是完整落幕词（>20KB；原片那句只有 13.1KB / 0.63s）', en.length > 20000, en.length + ' 字节')
+
+  /* 2026-10-27 换入的落幕词带 ID3v2 头，帧同步不在第 0 字节 —— 要跳过 ID3 再判 */
+  const mp3SyncOk = (b) => {
+    let i = 0
+    if (b.length > 10 && b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) {
+      const size = ((b[6] & 0x7f) << 21) | ((b[7] & 0x7f) << 14) | ((b[8] & 0x7f) << 7) | (b[9] & 0x7f)
+      i = 10 + size
+    }
+    return i + 1 < b.length && b[i] === 0xff && (b[i + 1] & 0xe0) === 0xe0
+  }
+  check('MP3 帧头有效（自动跳过 ID3v2）', mp3SyncOk(en), 'first sync @' + (en[0] === 0x49 ? 'ID3 之后' : '0'))
+
+  /* 中文素材已移除：不应再出现在发布包里 */
+  const assetDir = fileURLToPath(new URL('../lib/assets/', import.meta.url))
+  const zhLeft = fs.readdirSync(assetDir).filter((n) => n.endsWith('-zh.mp3'))
+  check('不含中文素材（已移除）', zhLeft.length === 0, zhLeft.join(',') || '无')
+
+  const src = fs.readFileSync(BUNDLE, 'utf8')
+  const reveal = src.indexOf("ui.welcome.classList.add('dsu-in')")
+  const play = src.indexOf('welcome = voice.line(')
+  check('终幕人声在欢迎文案亮起之后才开念', reveal >= 0 && play > reveal, 'reveal=' + reveal + ' play=' + play)
+  check('finale 开头不再提前播放（旧写法已删除）', src.indexOf('var welcome = voice.line') === -1)
+  check('揭幕前仍然等欢迎语播完', /\.then\(function \(\) \{ return welcome \}\)/.test(src))
+}
+
+console.log('\n[12] 卡死防线与重播隔离（外部审查发现的坑）')
+{
+  const src = fs.readFileSync(BUNDLE, 'utf8')
+
+  /* ① 停滞看门狗：不能只防「脚本没跑起来」，还要防「跑起来了但卡在中间」 */
+  check('有停滞看门狗（STALL_MS 常量）', /var STALL_MS = \d+/.test(src), /var STALL_MS = (\d+)/.exec(src)?.[1])
+  check('看门狗在 run() 里上弦', /function run\(\)[\s\S]{0,200}armStall\(\)/.test(src))
+  check('每推进一幕重新上弦', /function stepLoop\(\)[\s\S]{0,400}armStall\(\)/.test(src))
+  check('等用户操作时下弦（不踢走正在犹豫的人）', /function waitAction\(\)[\s\S]{0,300}disarmStall\(\)/.test(src))
+  check('看门狗触发时走 finish()', /stallTimer = setTimeout\(function \(\) \{[\s\S]{0,400}finish\(\)/.test(src))
+
+  /* ② 兜底判据不能是 dsu-boot 类名（它在 run() 之前就被摘掉） */
+  check('兜底改判 __DSH_STARTUP_RUNNING__', /__DSH_STARTUP_RUNNING__/.test(src))
+  check('兜底不再按 dsu-boot 类名判', !/classList\.contains\('dsu-boot'\)/.test(src))
+
+  /* ③ 音频永不来 onended 时也不能把 Promise 挂死 */
+  check('playAssetAndWait 有超时兜底', /buf\.duration \* 1000 \+ 1500/.test(src))
+  check('resolve 只生效一次（done 守卫）', /function fin\(ms\)[\s\S]{0,120}if \(done\) return/.test(src))
+
+  /* ④ 重播要拆旧实例，否则两套时间线互相打架 */
+  check('暴露 dispose()', /dispose: dispose/.test(src))
+  check('replay 前先 dispose 旧实例', /function injectSelf\(\)[\s\S]{0,400}prev\.dispose\(\)/.test(src))
+  check('dispose 会停语音（避免掐掉新实例）', /function dispose\(\)[\s\S]{0,600}voice\.stop\(\)/.test(src))
+  check('有代际号，旧链能自行失效', /__DSH_STARTUP_GEN__/.test(src) && /function stale\(\)/.test(src))
+  check('步骤链开头检查代际', /if \(finished \|\| stale\(\)\) return/.test(src))
+
+  /* ⑤ confirm 只能定义一次（旧实现被第二份覆盖，真素材分支成死代码） */
+  check('audio.confirm 只定义一次', (src.match(/confirm: function \(\)/g) || []).length === 1, String((src.match(/confirm: function \(\)/g) || []).length))
 }
 
 console.log('\n============================')

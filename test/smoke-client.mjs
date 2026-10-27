@@ -204,6 +204,35 @@ delete windowStub.__DSH_STARTUP_API__
 previewBtn.props.onClick()
 check('没有 API 时回退到 location.reload()', windowStub.__reloaded === true)
 
+console.log('\n[7] 面板与 README 对齐（音效来源 / 故障色 / 单一音效开关 / 范围）')
+{
+  const t = renderPanel()
+  const labels = []
+  const collect = (n) => {
+    if (!n || typeof n !== 'object') return
+    if (n.props && typeof n.props.label === 'string') labels.push(n.props.label)
+    if (n.props && typeof n.props.children === 'string') labels.push(n.props.children)
+    const kids = n.props && n.props.children
+    if (Array.isArray(kids)) kids.forEach(collect)
+    else if (kids && typeof kids === 'object') collect(kids)
+  }
+  collect(t)
+  check('面板有「音效来源」控件', labels.some((l) => l.indexOf('音效来源') !== -1), labels.filter((l) => l.indexOf('音效') !== -1).join('|'))
+  check('面板有「故障色 · 红」控件', labels.some((l) => l.indexOf('故障色 · 红') !== -1))
+  check('只有一处「界面音效」开关（旧「音效」已删）', labels.filter((l) => l === '音效').length === 0)
+
+  const ranges = []
+  const findRange = (n) => {
+    if (!n || typeof n !== 'object') return
+    if (n.props && typeof n.props.max === 'number' && typeof n.props.min === 'number' && n.props.step === 20) ranges.push(n.props)
+    const kids = n.props && n.props.children
+    if (Array.isArray(kids)) kids.forEach(findRange)
+    else if (kids && typeof kids === 'object') findRange(kids)
+  }
+  findRange(t)
+  check('「开口前留白」上限 1200ms（与 Host 一致）', ranges.some((r) => r.max === 1200), ranges.map((r) => r.max).join(','))
+}
+
 console.log('\n============================')
 console.log(`  通过 ${pass} / 失败 ${fail}`)
 console.log('============================\n')

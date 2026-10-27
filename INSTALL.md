@@ -3,7 +3,7 @@
 ## 一、直接安装（推荐）
 
 ```bash
-dsh plugin --profile web add ./dsh-startup-screen-1.1.2.tgz
+dsh plugin --profile web add ./dsh-startup-screen-1.2.0.tgz
 ```
 
 Windows 上双击 `安装.cmd` 也一样。
@@ -118,7 +118,7 @@ lib/client.js         设置面板（浏览器半）
 lib/assets/           真声台词 x5 + 终幕欢迎语 + 界面音效 x2
 cordis.patch.yml      bundle 层声明
 preview/index.html    离线预览页
-test/                 三套冒烟测试（146 项断言）
+test/                 四套冒烟测试（255 项断言）
 README.md             完整文档
 AUDIO-FIELDS.md       需要音频的字段清单
 ```

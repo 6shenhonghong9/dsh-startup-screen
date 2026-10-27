@@ -7,6 +7,17 @@ DeepSeek Harness 的启动界面与启动动画插件。
 
 ---
 
+## 效果预览
+
+| 暖白主题（默认） | 深色主题 |
+|---|---|
+| [![暖白主题 · 需要访问许可](docs/screenshots/theme-light.jpg)](docs/screenshots/theme-light.jpg) | [![深色主题 · 需要访问许可](docs/screenshots/theme-dark.jpg)](docs/screenshots/theme-dark.jpg) |
+
+> 上面是第一幕「需要访问许可」的实机截图。主题在 **设置页 →「启动动画」→ 视觉 → 主题** 里切换，
+> 两套配色的版式、文字位置、进度条与准星完全一致，只换底色与文字反相。
+
+---
+
 ## 功能
 
 **开机序列**　冷启动时播一段完整的开机动画，六幕连贯：厂牌标识 → 过曝洗白 →
@@ -18,8 +29,8 @@ DeepSeek Harness 的启动界面与启动动画插件。
 
 **中文主字 + 英文等宽副标题**　英文副标题逐字打出来，像终端在接收数据。
 
-**真声台词 + 界面音效**　五句台词和终幕欢迎语都是真声素材，界面音效取自同一段素材。
-浏览器要求先有一次点击才准出声，所以点过按钮之后才会听到声音。
+**真声台词 + 界面音效**　前五句台词取自原片真声，终幕欢迎语是自制落幕词（3.73 秒）；
+界面音效取自同一段素材。浏览器要求先有一次点击才准出声，所以点过按钮之后才会听到声音。
 
 **语音没播完不会推进**　每一步停留多久由实际音频时长决定。你点得快也不会把语音掐断。
 
@@ -44,19 +55,29 @@ DeepSeek Harness 的启动界面与启动动画插件。
 ## 安装
 
 ```bash
-dsh plugin --profile web add ./dsh-startup-screen-1.0.0.tgz
+dsh plugin --profile web add ./dsh-startup-screen-1.2.0.tgz
 ```
 
-Windows 上也可以解压 release 压缩包后**双击「安装.cmd」**，脚本会自动完成同样的操作。
+桌面端（DeepSeek Harness Desktop）同样支持，profile 换成 `desktop`：
 
-**装完重启 dsh web**（关掉启动器窗口再重新双击）。重启后刷新页面就能看到启动动画，
+```bash
+dsh plugin --profile desktop add ./dsh-startup-screen-1.2.0.tgz
+```
+
+> 部分 DSH 版本会拒绝在终端里操作 `desktop` profile（提示 managed exclusively by the
+> Electron application），此时请用桌面端的「插件」页安装，或按 `DESKTOP.md` 走 junction。
+
+Windows 上也可以解压 release 压缩包后**双击「安装.cmd」**，脚本会自动识别
+`web` / `desktop` 两个 profile 并逐个安装。
+
+**装完重启 dsh web 或桌面端**（关掉启动器窗口再重新双击）。重启后刷新页面就能看到启动动画，
 设置页里会多出一项「启动动画」。
 
 ### 环境要求
 
 | 项 | 要求 |
 |---|---|
-| 平台 | DSH **web** profile |
+| 平台 | DSH **web** profile / DSH **desktop** profile（标题栏透明仅 Windows 桌面端） |
 | Node | **>= 20** |
 | 依赖 | 无（不需要 `npm install`） |
 
