@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -157,6 +157,11 @@
     mode: 'always',
     theme: 'light',
     speed: 1,
+    transparent: false,
+    alphaCurtain: 0.2,
+    alphaPlate: 0.25,
+    alphaWelcome: 0.18,
+    glassBlur: 7,
     requireInteraction: true,
     allowSkip: true,
     sound: false,
@@ -212,6 +217,27 @@
       <div class="row">
         <label>速度 <span id="fSpeedVal">1.00×</span></label>
         <input type="range" id="fSpeed" min="0.35" max="3" step="0.05" value="1">
+      </div>
+    </div>
+    <div class="chk"><input type="checkbox" id="fTransparent"><label for="fTransparent"><b>透明度主题</b>（黑幕 / 档案底板 / 终幕换成半透明磨砂玻璃，配色跟随主题）</label></div>
+    <div class="row2">
+      <div class="row">
+        <label>首幕黑幕 · 不透明度 <span id="fACVal">20%</span></label>
+        <input type="range" id="fAC" min="0" max="1" step="0.01" value="0.2">
+      </div>
+      <div class="row">
+        <label>档案底板 · 不透明度 <span id="fAPVal">25%</span></label>
+        <input type="range" id="fAP" min="0" max="1" step="0.01" value="0.25">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="row">
+        <label>终幕欢迎 · 不透明度 <span id="fAWVal">18%</span></label>
+        <input type="range" id="fAW" min="0" max="1" step="0.01" value="0.18">
+      </div>
+      <div class="row">
+        <label>磨砂模糊 <span id="fBlurVal">7 px</span></label>
+        <input type="range" id="fBlur" min="0" max="40" step="1" value="7">
       </div>
     </div>
     <div class="chk"><input type="checkbox" id="fInteract" checked><label for="fInteract">需要人工确认（第 1、2 步停下来等按钮）</label></div>
@@ -334,6 +360,15 @@
                 <option value="dark">深色 · 暗底板</option>
               </select>
             </div>
+            <label class="__ss_check"><input type="checkbox" id="sTransparent"><span class="__ss_checkText"><span>透明度主题（半透明磨砂玻璃）</span><span class="__ss_hint">黑幕 / 档案底板 / 终幕换成半透明磨砂玻璃，透出背后的桌面或界面；只影响背景层，文字、按钮、扫描线保持原样。配色跟随上面的主题 —— 深色 = 烟灰玻璃，浅色 = 暖白玻璃。</span></span></label>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">首幕黑幕 · 不透明度</label><div class="__ss_row"><input type="range" id="sAC" min="0" max="1" step="0.01" value="0.2" style="flex:1"><span class="__ss_status" id="sACVal">20%</span></div><div class="__ss_hint">100% = 完全实心（原样），0% = 全透明。</div></div>
+              <div class="__ss_field"><label class="__ss_label">档案底板 · 不透明度</label><div class="__ss_row"><input type="range" id="sAP" min="0" max="1" step="0.01" value="0.25" style="flex:1"><span class="__ss_status" id="sAPVal">25%</span></div></div>
+            </div>
+            <div class="__ss_two">
+              <div class="__ss_field"><label class="__ss_label">终幕欢迎 · 不透明度</label><div class="__ss_row"><input type="range" id="sAW" min="0" max="1" step="0.01" value="0.18" style="flex:1"><span class="__ss_status" id="sAWVal">18%</span></div></div>
+              <div class="__ss_field"><label class="__ss_label">磨砂模糊</label><div class="__ss_row"><input type="range" id="sBlur" min="0" max="40" step="1" value="7" style="flex:1"><span class="__ss_status" id="sBlurVal">7 px</span></div><div class="__ss_hint">0 = 只透不糊。</div></div>
+            </div>
             <div class="__ss_two">
               <div class="__ss_field"><label class="__ss_label">强调色 · 橙</label><div class="__ss_row"><input class="__ss_swatch" type="color" value="#ff7500" id="sAccent"><span class="__ss_status">#ff7500</span></div></div>
               <div class="__ss_field"><label class="__ss_label">故障色 · 蓝</label><div class="__ss_row"><input class="__ss_swatch" type="color" value="#2971b8" id="sGlitch"><span class="__ss_status">#2971b8</span></div></div>
@@ -386,6 +421,15 @@
     c.identityId = $('fId').value || '';
     c.accessLevel = $('fLevel').value || '3';
     c.theme = $('fTheme').value;
+    c.transparent = $('fTransparent').checked;
+    c.alphaCurtain = Number($('fAC').value);
+    c.alphaPlate = Number($('fAP').value);
+    c.alphaWelcome = Number($('fAW').value);
+    c.glassBlur = Number($('fBlur').value);
+    $('fACVal').textContent = Math.round(c.alphaCurtain * 100) + '%';
+    $('fAPVal').textContent = Math.round(c.alphaPlate * 100) + '%';
+    $('fAWVal').textContent = Math.round(c.alphaWelcome * 100) + '%';
+    $('fBlurVal').textContent = c.glassBlur + ' px';
     c.speed = Number($('fSpeed').value);
     c.requireInteraction = $('fInteract').checked;
     c.allowSkip = $('fSkip').checked;
@@ -412,12 +456,20 @@
   }
 
   /* 控制台里输完立刻生效需要重播；这里做成"改完点重播"，避免打字打到一半动画重启 */
-  ['fIdentity', 'fId', 'fLevel', 'fTheme', 'fSpeed', 'fInteract', 'fSkip'].forEach(function (id) {
+  ['fIdentity', 'fId', 'fLevel', 'fTheme', 'fSpeed', 'fInteract', 'fSkip',
+    'fTransparent', 'fAC', 'fAP', 'fAW', 'fBlur'].forEach(function (id) {
     $(id).addEventListener('input', function () {
       // 只更新显示，不打断正在播放的动画
       $('fSpeedVal').textContent = Number($('fSpeed').value).toFixed(2) + '×';
+      updateAlphaLabels();
     });
   });
+  function updateAlphaLabels() {
+    $('fACVal').textContent = Math.round(Number($('fAC').value) * 100) + '%';
+    $('fAPVal').textContent = Math.round(Number($('fAP').value) * 100) + '%';
+    $('fAWVal').textContent = Math.round(Number($('fAW').value) * 100) + '%';
+    $('fBlurVal').textContent = Number($('fBlur').value) + ' px';
+  }
 
   /* ── 音色列表（女声排前面）+ 试听 ──────────────────────────────────── */
   var NATURAL_HINTS = ['natural','neural','online','premium','enhanced','siri','google'];
@@ -525,12 +577,23 @@
     $('fId').value = $('sId').value;
     $('fLevel').value = $('sLevel').value;
     $('fTheme').value = $('sTheme').value;
+    $('fTransparent').checked = $('sTransparent').checked;
+    $('fAC').value = $('sAC').value;
+    $('fAP').value = $('sAP').value;
+    $('fAW').value = $('sAW').value;
+    $('fBlur').value = $('sBlur').value;
     $('fSpeed').value = $('sSpeed').value;
     $('fInteract').checked = $('sInteract').checked;
     $('fSkip').checked = $('sSkip').checked;
     applyConfig();
   }
   $('sIdentity').addEventListener('input', function () { $('fIdentity').value = this.value; });
+  ['sAC', 'sAP', 'sAW', 'sBlur'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      var v = Number(this.value);
+      $(id + 'Val').textContent = id === 'sBlur' ? v + ' px' : Math.round(v * 100) + '%';
+    });
+  });
   $('sSpeed').addEventListener('input', function () {
     $('sSpeedVal').textContent = Number(this.value).toFixed(2) + '×';
     $('fSpeed').value = this.value;
@@ -545,6 +608,11 @@
   $('sReset').addEventListener('click', function () {
     $('sIdentity').value = 'JOYCE MOORE'; $('sId').value = '0087';
     $('sLevel').value = '3'; $('sTheme').value = 'light';
+    $('sTransparent').checked = false;
+    $('sAC').value = 0.2; $('sACVal').textContent = '20%';
+    $('sAP').value = 0.25; $('sAPVal').textContent = '25%';
+    $('sAW').value = 0.18; $('sAWVal').textContent = '18%';
+    $('sBlur').value = 7; $('sBlurVal').textContent = '7 px';
     $('sSpeed').value = 1; $('sSpeedVal').textContent = '1.00×';
     $('sInteract').checked = true; $('sSkip').checked = true; $('sSound').checked = false;
     $('sBrand1').value = 'DEEPSEEK'; $('sBrand2').value = 'SYNTHESIZE INTELLIGENCE';

@@ -11,6 +11,13 @@
  *   --dsu-zh    微软雅黑（对应参考片底部中文小字幕）
  * ========================================================================== */
 
+/* 终幕切透明度时让底板渐变能平滑过渡；不支持 @property 的浏览器直接跳变，功能不受影响 */
+@property --dsu-page-alpha {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 #dsh-startup-root,
 #dsh-startup-root *,
 #dsh-startup-root *::before,
@@ -53,6 +60,21 @@
 
   --dsu-speed: 1;
 
+  /* —— 透明度主题（.dsu-clear）—— */
+  /* 三幕背景各自的不透明度，由 splash.js 按配置写成内联变量；
+     没开透明度主题时恒为 1，视觉与原主题逐像素一致。 */
+  --dsu-a-curtain: 1;
+  --dsu-a-plate: 1;
+  --dsu-a-welcome: 1;
+  --dsu-page-alpha: var(--dsu-a-plate);
+  --dsu-glass-blur: 0px;
+  /* 每幕实际生效的模糊：splash.js 按「玻璃厚度」折算后写进来，
+     不透明度越接近 0 越不糊，0 时完全不糊（全透明）。 */
+  --dsu-blur-curtain: 0px;
+  --dsu-blur-plate: 0px;
+  --dsu-blur-welcome: 0px;
+  --dsu-blur-page: var(--dsu-blur-plate);
+
   position: fixed;
   inset: 0;
   z-index: 2147483000;
@@ -66,6 +88,7 @@
   -webkit-user-select: none;
   user-select: none;
   contain: layout paint style;
+  transition: --dsu-page-alpha 700ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 逐字渐显（typeIn）：用不透明度而非截断，居中排版不会左右抖动 */
@@ -97,6 +120,68 @@
   --dsu-box-ink: #0b0b0c;
   --dsu-sub-glow: 0 0 6px rgba(0, 0, 0, 0.9);
   background: #000;
+}
+
+/* ── 透明度主题：三幕各一张半透明磨砂玻璃 ─────────────────────────────────
+   只动背景层：文字、按钮、扫描线、身份卡全部保持原样，和「透明磨砂主题」
+   一个原则。配色仍由浅色 / 深色主题决定 —— 浅色玻璃=暖白，深色玻璃=烟灰。
+   三幕分别是：首幕黑幕 / 六幕档案底板 / 终幕欢迎画面，各自一条不透明度滑杆。 */
+#dsh-startup-root.dsu-clear {
+  background: transparent;
+  /* backdrop-filter 要采样插件之外的画面；去掉 paint 隔离，免得只糊到自己 */
+  contain: layout style;
+}
+/* 首屏兜底那一层也要跟着透明，否则启用后会先闪一块纯黑 */
+#dsh-startup-root.dsu-clear.dsu-boot::after {
+  background: rgba(4, 6, 10, var(--dsu-a-curtain));
+  -webkit-backdrop-filter: blur(var(--dsu-blur-curtain));
+  backdrop-filter: blur(var(--dsu-blur-curtain));
+}
+/* 首幕黑幕 */
+#dsh-startup-root.dsu-clear .dsu-black {
+  background: rgba(4, 6, 10, var(--dsu-a-curtain));
+  -webkit-backdrop-filter: blur(var(--dsu-blur-curtain));
+  backdrop-filter: blur(var(--dsu-blur-curtain));
+}
+/* 第二幕：档案底板（浅色玻璃 / 深色玻璃） */
+#dsh-startup-root.dsu-clear .dsu-plate {
+  background:
+    radial-gradient(120% 90% at 78% 12%, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(168deg,
+      rgba(236, 234, 230, var(--dsu-page-alpha)) 0%,
+      rgba(229, 227, 223, var(--dsu-page-alpha)) 42%,
+      rgba(229, 227, 223, var(--dsu-page-alpha)) 100%);
+  -webkit-backdrop-filter: blur(var(--dsu-blur-page)) saturate(1.08);
+  backdrop-filter: blur(var(--dsu-blur-page)) saturate(1.08);
+}
+#dsh-startup-root.dsu-clear.dsu-dark .dsu-plate {
+  background:
+    radial-gradient(120% 90% at 78% 12%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(168deg,
+      rgba(19, 19, 21, var(--dsu-page-alpha)) 0%,
+      rgba(11, 11, 12, var(--dsu-page-alpha)) 42%,
+      rgba(11, 11, 12, var(--dsu-page-alpha)) 100%);
+}
+/* 黑→白的过曝洗白在透明主题下减淡，别整块盖住背后的界面 */
+#dsh-startup-root.dsu-clear .dsu-wash { background: rgba(139, 138, 136, 0.72); }
+/* 档案水印格子：不透明底板上本来是极淡的纸纹，换成玻璃后白色会浮上来，
+   这里压回"隐约可见"的量级，免得几条竖直白带抢戏 */
+#dsh-startup-root.dsu-clear .dsu-wm {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+  border-color: rgba(10, 10, 10, 0.05);
+}
+#dsh-startup-root.dsu-clear.dsu-dark .dsu-wm {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+  border-color: rgba(255, 255, 255, 0.06);
+}
+/* 终幕的墨块也留一点透 —— 高不透明度保证字仍然清楚 */
+#dsh-startup-root.dsu-clear .dsu-w2 { background: rgba(10, 10, 10, 0.86); }
+#dsh-startup-root.dsu-clear.dsu-dark .dsu-w2 { background: rgba(242, 241, 238, 0.9); }
+/* 终幕：底板平滑切到「终幕不透明度」，揭幕前先透出主界面；
+   模糊跟着一起换档（这一层不做过渡，避免 700ms 里逐帧重算 backdrop-filter） */
+#dsh-startup-root.dsu-welcome-act {
+  --dsu-page-alpha: var(--dsu-a-welcome);
+  --dsu-blur-page: var(--dsu-blur-welcome);
 }
 
 /* 首屏兜底：脚本还没跑起来时也要先糊住整个窗口，避免闪出应用本体 */

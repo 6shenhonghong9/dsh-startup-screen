@@ -278,6 +278,50 @@ for (const cls of [
 console.log('\n[3] JS 用到的每个选择器都真实存在')
 check('没有落空的选择器', MISSED.size === 0, [...MISSED].join(', '))
 
+console.log('\n[3b] 透明度主题：class / 内联变量 / 夹取')
+r = run(true)
+check('默认不带 dsu-clear（原主题逐像素不变）', !r.root.classList.contains('dsu-clear'))
+check('默认三幕不透明度 = 1', r.root.style.getPropertyValue('--dsu-a-curtain') === '1' &&
+  r.root.style.getPropertyValue('--dsu-a-plate') === '1' &&
+  r.root.style.getPropertyValue('--dsu-a-welcome') === '1')
+check('默认磨砂模糊 = 0px', r.root.style.getPropertyValue('--dsu-glass-blur') === '0px')
+
+r = run(true, { transparent: true, alphaCurtain: 0.7, alphaPlate: 0.5, alphaWelcome: 0.1, glassBlur: 22 })
+check('开启后 root 带 dsu-clear', r.root.classList.contains('dsu-clear'), r.root._cls)
+check('首幕不透明度落到 --dsu-a-curtain', r.root.style.getPropertyValue('--dsu-a-curtain') === '0.7', r.root.style.getPropertyValue('--dsu-a-curtain'))
+check('底板不透明度落到 --dsu-a-plate', r.root.style.getPropertyValue('--dsu-a-plate') === '0.5')
+check('终幕不透明度落到 --dsu-a-welcome', r.root.style.getPropertyValue('--dsu-a-welcome') === '0.1')
+check('磨砂模糊落到 --dsu-glass-blur', r.root.style.getPropertyValue('--dsu-glass-blur') === '22px')
+check('API.config 反射透明配置', r.windowStub.__DSH_STARTUP_API__.config.transparent === true &&
+  r.windowStub.__DSH_STARTUP_API__.config.alphaPlate === 0.5)
+
+r = run(true, { transparent: '1', alphaCurtain: -3, alphaPlate: 9, alphaWelcome: '0.4', glassBlur: 999 })
+check('字符串 "1" 也认作开启', r.root.classList.contains('dsu-clear'))
+check('alphaCurtain 低于下限夹到 0', r.windowStub.__DSH_STARTUP_API__.config.alphaCurtain === 0)
+check('alphaPlate 高于上限夹到 1', r.windowStub.__DSH_STARTUP_API__.config.alphaPlate === 1)
+check('alphaWelcome 字符串转数字', r.windowStub.__DSH_STARTUP_API__.config.alphaWelcome === 0.4)
+check('glassBlur 夹到 40', r.windowStub.__DSH_STARTUP_API__.config.glassBlur === 40)
+
+const cssSrc = fs.readFileSync(fileURLToPath(new URL('../lib/splash.css', import.meta.url)), 'utf8')
+check('CSS 有 @property --dsu-page-alpha（终幕切换可过渡）', cssSrc.includes('@property --dsu-page-alpha'))
+check('CSS 有透明底板规则', cssSrc.includes('.dsu-clear .dsu-plate'))
+check('CSS 有终幕切页规则', cssSrc.includes('.dsu-welcome-act'))
+check('CSS 透明模式下放开 paint 隔离', /#dsh-startup-root\.dsu-clear\s*\{[^}]*contain:\s*layout style/.test(cssSrc))
+
+/* 「越小越透」还要连模糊一起收：0 时背景必须真的干净，不能只剩一层糊 */
+r = run(true, { transparent: true, alphaCurtain: 0, alphaPlate: 0, alphaWelcome: 0, glassBlur: 30 })
+check('三幕拉到 0 时模糊也归零（背景全透、不再糊）',
+  ['curtain', 'plate', 'welcome'].every((k) => r.root.style.getPropertyValue('--dsu-blur-' + k) === '0.00px'),
+  ['curtain', 'plate', 'welcome'].map((k) => r.root.style.getPropertyValue('--dsu-blur-' + k)).join(' | '))
+r = run(true, { transparent: true, alphaCurtain: 0.05, alphaPlate: 0.25, alphaWelcome: 1, glassBlur: 20 })
+const blurCurtain = parseFloat(r.root.style.getPropertyValue('--dsu-blur-curtain'))
+const blurPlate = parseFloat(r.root.style.getPropertyValue('--dsu-blur-plate'))
+check('不透明度越高模糊越强（单调、25% 以上满强度）',
+  blurCurtain > 0 && blurCurtain < blurPlate && r.root.style.getPropertyValue('--dsu-blur-plate') === '20.00px',
+  'curtain=' + blurCurtain + ' plate=' + blurPlate)
+check('CSS 三幕各用自己的模糊变量', cssSrc.includes('blur(var(--dsu-blur-curtain))') &&
+  cssSrc.includes('blur(var(--dsu-blur-page))') && cssSrc.includes('--dsu-blur-welcome'))
+
 console.log('\n[4] 没有 speechSynthesis 的环境（老浏览器 / 隐私模式）')
 r = run(false)
 check('初始化不抛异常', r.thrown === null, r.thrown && r.thrown.message)
@@ -465,7 +509,7 @@ console.log('\n[12] 卡死防线与重播隔离（外部审查发现的坑）')
 
   /* ④ 重播要拆旧实例，否则两套时间线互相打架 */
   check('暴露 dispose()', /dispose: dispose/.test(src))
-  check('replay 前先 dispose 旧实例', /function injectSelf\(\)[\s\S]{0,400}prev\.dispose\(\)/.test(src))
+  check('replay 前先 dispose 旧实例', /function injectSelf\(cfg\)[\s\S]{0,500}prev\.dispose\(\)/.test(src))
   check('dispose 会停语音（避免掐掉新实例）', /function dispose\(\)[\s\S]{0,600}voice\.stop\(\)/.test(src))
   check('有代际号，旧链能自行失效', /__DSH_STARTUP_GEN__/.test(src) && /function stale\(\)/.test(src))
   check('步骤链开头检查代际', /if \(finished \|\| stale\(\)\) return/.test(src))

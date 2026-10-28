@@ -3,7 +3,7 @@
 ## 一、直接安装（推荐）
 
 ```bash
-dsh plugin --profile web add ./dsh-startup-screen-1.2.0.tgz
+dsh plugin --profile web add ./dsh-startup-screen-1.3.1.tgz
 ```
 
 Windows 上双击 `安装.cmd` 也一样。
@@ -89,7 +89,7 @@ dsh plugin --profile web remove dsh-startup-screen
 | 身份资料 | 身份名称（默认 `JOYCE MOORE`）、编号、权限等级 |
 | 交互 | 是否要求点击按钮确认 |
 | 语音与音效 | 语音开关、**语音来源（真声素材 / 系统 TTS）**、音色、语速、音调、音量、播报前提示音、开口前留白；界面音效开关与音量 |
-| 视觉 | 主题、动效强度 |
+| 视觉 | 主题、**透明度主题**（首幕 / 档案底板 / 终幕三条不透明度 + 磨砂模糊）、动效强度 |
 | 文案 | 中文主字 / 英文副标题 / 日志行 / 按钮文字 |
 
 配置落盘在 `$DSH_HOME/dsh-startup.json`（默认 `~/.dsh/dsh-startup.json`）。
