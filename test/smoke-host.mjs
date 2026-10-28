@@ -221,6 +221,24 @@ check('幂等：二次调用不重复注入', TAPS[0](after) === after)
 check('原 <div id="root"></div> 仍在（应用照常挂载）', after.includes('<div id="root"></div>'))
 check('内联载荷里没有裸的 < （防 </script> 提前闭合）', !inlinePayload(after).includes('<'))
 
+console.log('\n[6b] 透明度主题：配置夹取 + 首屏兜底跟着透明')
+r = await call('exact /dsh-startup/config', 'POST', JSON.stringify({
+  patch: { transparent: true, alphaCurtain: -1, alphaPlate: 5, alphaWelcome: '0.5', glassBlur: 99 }
+}))
+cfg = JSON.parse(r.body)
+check('transparent 写入 true', cfg.config.transparent === true)
+check('alphaCurtain 低于下限夹到 0', cfg.config.alphaCurtain === 0, String(cfg.config.alphaCurtain))
+check('alphaPlate 高于上限夹到 1', cfg.config.alphaPlate === 1, String(cfg.config.alphaPlate))
+check('alphaWelcome 字符串 "0.5" 转成数字', cfg.config.alphaWelcome === 0.5, String(cfg.config.alphaWelcome))
+check('glassBlur 夹到上限 40', cfg.config.glassBlur === 40, String(cfg.config.glassBlur))
+const clearHtml = TAPS[0](before)
+check('透明模式下挂载点带 dsu-clear 类', clearHtml.includes('class="dsu-root dsu-boot dsu-clear"'))
+check('首屏兜底换成半透明磨砂玻璃', clearHtml.includes('id="dsh-startup-critical"') &&
+  clearHtml.includes('backdrop-filter:blur(') && clearHtml.includes('rgba(4,6,10,'))
+check('透明模式下首屏不再是纯黑', !/dsu-boot\{position:fixed[^}]*background:#000/.test(clearHtml))
+r = await call('exact /dsh-startup/config', 'POST', JSON.stringify({ action: 'reset' }))
+check('reset 后透明主题回到关闭', JSON.parse(r.body).config.transparent === false)
+
 console.log('\n[7] XSS 边界：身份名称里的尖括号不会逃出内联脚本')
 await call('exact /dsh-startup/config', 'POST', JSON.stringify({ patch: { identity: '</script><img src=x onerror=alert(1)>' } }))
 const payload = inlinePayload(TAPS[0](before))

@@ -1,6 +1,6 @@
 {
   "name": "dsh-startup-screen",
-  "version": "1.2.0",
+  "version": "1.3.1",
   "description": "DeepSeek Harness 启动界面与启动动画：黑幕 DeepSeek 标识 → 过曝洗白 → 暖白档案底板 → 交互式访问授权序列（需要访问许可 / 身份资料确认 / 接收访问需求 / 开始读取权限 / 读取完毕·核验通过 / 欢迎访问）。中文主字 + 英文等宽副标题，真声素材 + 界面音效，身份名称等参数在 DSH 设置页可改。web profile 与 DeepSeek Harness Desktop 桌面端通用。桌面端（Windows）播放启动动画期间把标题栏整层透明化：最小化/最大化/关闭按钮与其底色一并不可见，播放结束自动还原。",
   "keywords": [
     "dsh",

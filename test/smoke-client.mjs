@@ -63,6 +63,7 @@ const CFG = {
   orgZh: '深度求索', orgEn: 'DEEPSEEK', orgSub: 'DEEPSEEK HARNESS',
   welcomeBox: 'DEEPSEEK HARNESS', footer: 'POWERED BY DEEPSEEK',
   accent: '#ff7500', glitchA: '#ff3b30', glitchB: '#2971b8',
+  transparent: true, alphaCurtain: 0.5, alphaPlate: 0.3, alphaWelcome: 0.2, glassBlur: 12,
 }
 let versionInResponse = '9.9.9'
 const requests = []
@@ -171,6 +172,16 @@ check('渲染出音色选择（无 speechSynthesis 时给出提示）', texts.in
 check('渲染出语速/音调/音量', texts.includes('语速') && texts.includes('音调') && texts.includes('音量'))
 check('渲染出「立即预览」按钮', !!find(tree, (n) => n.type === 'button' && n.props.children === '立即预览'))
 check('渲染出「恢复默认」按钮', !!find(tree, (n) => n.type === 'button' && n.props.children === '恢复默认'))
+check('渲染出透明度主题开关', texts.includes('透明度主题（半透明玻璃）'))
+check('开启后渲染三条不透明度滑杆', texts.includes('首幕 · 黑幕') &&
+  texts.includes('档案底板 · 六幕') && texts.includes('终幕 · 欢迎'))
+check('渲染出「磨砂模糊」滑杆', texts.includes('磨砂模糊'))
+check('不透明度滑杆显示百分比（50% / 30% / 20%）', texts.includes('50%') && texts.includes('30%') && texts.includes('20%'),
+  texts.filter((t) => /%$/.test(t)).join(','))
+check('渲染出「通透玻璃」预设按钮', !!find(tree, (n) => n.type === 'button' && String(n.props.children).includes('通透玻璃')))
+const ranges = walk(tree).filter((n) => n.type === 'input' && n.props.type === 'range').map((n) => n.props.value)
+check('滑杆回填当前配置（0.5 / 0.3 / 0.2 / 12）',
+  [0.5, 0.3, 0.2, 12].every((v) => ranges.includes(v)), JSON.stringify(ranges))
 
 console.log('\n[5] 改身份名称 → 保存')
 idInput.props.onChange({ target: { value: '琉璃' } })
@@ -195,11 +206,16 @@ await flush(); await flush()
 const resetPost = requests.filter((r) => r.init && r.init.method === 'POST').pop()
 check('恢复默认 POST {action:"reset"}', resetPost && JSON.parse(resetPost.init.body).action === 'reset', resetPost && resetPost.init.body)
 
-windowStub.__DSH_STARTUP_API__ = { replay() { windowStub.__replayed = true } }
+windowStub.__DSH_STARTUP_API__ = { replay(cfg) { windowStub.__replayed = cfg } }
 tree = renderPanel()
+const speedRange = find(tree, (n) => n.type === 'input' && n.props.type === 'range' && n.props.min === 0.35)
+speedRange.props.onChange({ target: { value: '2.2' } })
+await flush()
+tree = renderPanel()  // 改完要重渲染，预览按钮拿到的才是新草稿
 const previewBtn = find(tree, (n) => n.type === 'button' && n.props.children === '立即预览')
 previewBtn.props.onClick()
-check('立即预览调用 __DSH_STARTUP_API__.replay()', windowStub.__replayed === true)
+check('立即预览把当前草稿传给 replay（否则改了等于没改）',
+  windowStub.__replayed && windowStub.__replayed.speed === 2.2, JSON.stringify(windowStub.__replayed && windowStub.__replayed.speed))
 delete windowStub.__DSH_STARTUP_API__
 previewBtn.props.onClick()
 check('没有 API 时回退到 location.reload()', windowStub.__reloaded === true)
