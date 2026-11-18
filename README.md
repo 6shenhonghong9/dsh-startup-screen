@@ -121,6 +121,14 @@ dsh plugin --profile web remove dsh-startup-screen
 | 玻璃饱和度 | 160% | 100% – 200%，越高越通透 |
 | 背景模糊 | 28 px | 0 – 80 px，直接糊应用本体；20–30 px 最像照片，超过 60 会糊成纯色 |
 | 速度 | 1× | 整段动画的快慢，0.35 – 3 倍 |
+
+> **玻璃的副作用（已知边界）**：开启液态玻璃后，底板是半透明材质，会采样它背后的页面内容。
+> 因此 `document.body` 下、`position: fixed` 的第三方浮层（余额挂件、播报条等）在启动动画期间
+> 可能透出淡色轮廓；不透明度调到 95% 仍会有轻微残影，只有关掉玻璃总开关才是 0% 透过率。
+>
+> 1.3.1 起启动界面不再对这类浮层做「背景模糊」（只处理应用本体），并对外暴露两个配合点：
+> `body[data-dsh-startup-running]` 属性与 `window.dshwRegisterMask(root)` 登记接口。
+> 浮层只要写一条 `body[data-dsh-startup-running] .your-root { visibility: hidden; }` 即可完全隐身。
 | 要求确认 | 开 | 第 1、2 步是否等你点按钮才继续 |
 | 允许跳过 | 开 | 是否显示右上角跳过按钮、是否响应 Esc |
 
@@ -168,6 +176,25 @@ dsh plugin --profile web remove dsh-startup-screen
 | 黑幕三行 | `深度求索` / `DEEPSEEK` / `DEEPSEEK HARNESS` | 开场黑幕上的字 |
 | 终幕方框 | `DEEPSEEK HARNESS` | 揭幕后中央的黑底白字框 |
 | 页脚 | `POWERED BY DEEPSEEK` | 右下角页脚 |
+
+---
+
+## 更新（1.3.1）
+
+**修改**
+
+- 背景模糊（`blurAppBackdrop`）不再作用于第三方浮层：只处理应用本体，`document.body` 下
+  `position: fixed` 且层级低于启动界面的节点会被跳过，也不再改写它们的 `filter`。
+
+**新增**
+
+| 名称 | 用途 |
+|---|---|
+| `body[data-dsh-startup-running]` | 启动动画播放期间挂上、结束移除。第三方浮层写一条 CSS 即可自隐：<br>`body[data-dsh-startup-running] .your-root { visibility: hidden; }` |
+| `window.dshwRegisterMask(root)` | 自动登记启动界面为「当前最高可见层」，浮层管理器据此判断层级（接口由余额挂件 0.4.2 提供，存在才调用） |
+| `data-dsh-overlay` | 浮层约定标记，带此属性的节点不会被启动界面模糊或改写样式 |
+
+> 液态玻璃仍会采样背后页面，这是材质的物理结果；上述接口让浮层可以主动隐身，而不是依赖把玻璃关掉。
 
 ---
 

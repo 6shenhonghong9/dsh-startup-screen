@@ -586,6 +586,17 @@ console.log('\n[16] 背景模糊必须真的生效（contain:paint 回归防线�
   check('背景模糊直接作用于应用本体，且上限 60（超过就成纯色）', /blurAppBackdrop\(Math\.min\(60, backdropBlur\)\)/.test(src))
   check('揭幕会还原应用本体的 filter', /function finish\(\)[\s\S]{0,400}restoreAppBackdrop\(\)/.test(src))
   check('dispose 也会还原', /function dispose\(\)[\s\S]{0,300}restoreAppBackdrop\(\)/.test(src))
+
+  /* 第三方浮层：不糊、不改写 filter，并对外暴露配合点 */
+  check('有 isForeignOverlay 判定', /function isForeignOverlay\(node\)/.test(src))
+  check('支持 data-dsh-overlay 约定标记', /data-dsh-overlay/.test(src))
+  check('fixed 且层级低于启动界面的按浮层处理', /position === 'fixed'/.test(src) && /z < 2147483000/.test(src))
+  check('模糊循环里跳过第三方浮层', /if \(isForeignOverlay\(node\)\) continue/.test(src))
+  check('启动期给 body 打标记', /setAttribute\('data-dsh-startup-running'/.test(src))
+  check('收尾移除启动期标记', /removeAttribute\('data-dsh-startup-running'/.test(src))
+  check('向浮层管理器登记启动界面', /window\.dshwRegisterMask\(root\)/.test(src))
+  check('收尾注销登记', /typeof unregisterMask === 'function'\) unregisterMask\(\)/.test(src))
+  check('创建时登记、finish 与 dispose 各撤销一次', /beginStartupExposure\(\)/.test(src) && (src.match(/endStartupExposure\(\)/g) || []).length >= 3)
 }
 
 console.log('\n============================')
